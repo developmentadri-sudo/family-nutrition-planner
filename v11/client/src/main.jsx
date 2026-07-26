@@ -4,7 +4,6 @@ import { api } from './services/api.js';
 import './styles.css';
 
 const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
-const tabs = ['Today', 'Week', 'Profiles'];
 const planStart = new Date(2026, 6, 6);
 
 function Icon({ name }) {
@@ -128,9 +127,25 @@ function App() {
         <div className="wrap top">
           <div>
             <h1>Family Nutrition Planner</h1>
-            <p>v11 dynamic planning workspace</p>
           </div>
-          <div className="tabs">{tabs.map(tab => <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab}</button>)}</div>
+          <div className="headerNav">
+            <div className="viewToggle" aria-label="View mode">
+              <button className={activeTab === 'Today' ? 'active' : ''} onClick={() => setActiveTab('Today')}>Day</button>
+              <button className={activeTab === 'Week' ? 'active' : ''} onClick={() => setActiveTab('Week')}>Week</button>
+            </div>
+            <div className="familyAvatars" aria-label="Family profiles">
+              {(family.profiles || []).length === 0 && (
+                <button className="familyAvatar avatarTone1" onClick={() => setActiveTab('Profiles')} title="Profiles">
+                  <Icon name="user" />
+                </button>
+              )}
+              {(family.profiles || []).slice(0, 3).map((profile, index) => (
+                <button className={`familyAvatar avatarTone${index + 1}`} key={profile.id} onClick={() => setActiveTab('Profiles')} title={`${profile.name} profile`}>
+                  <span className="avatarLetter">{profile.name?.slice(0, 1).toUpperCase() || 'P'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </header>
       <main className="shell">
@@ -218,8 +233,7 @@ function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal
   }
   return (
     <section className="today">
-      <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} />
-      <div className="toolbar"><div><h2>{day.label}</h2></div><div className="toolbarActions"><button onClick={() => setEventOpen(true)}><Icon name="plus" /> Add event</button><button onClick={() => onAdaptDay(selectedDay)}><Icon name="ai" /> Adapt day</button></div></div>
+      <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} onAdd={() => setEventOpen(true)} onAdapt={() => onAdaptDay(selectedDay)} />
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
         : <MealCard key={item.id} meal={item} family={family} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} />)}</div>
@@ -231,18 +245,23 @@ function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal
   );
 }
 
-function WeekSelector({ week, selectedDay, onSelectDay, onShift }) {
+function WeekSelector({ week, selectedDay, onSelectDay, onShift, onAdd, onAdapt }) {
   return (
     <div className="weekSelector">
-      <div className="weekNav">
+      <div className="stripNav">
         <button className="ghostIcon" onClick={() => onShift(-1)}><Icon name="chevronLeft" /></button>
-        <h2>{weekRange(week)}</h2>
+        <div className="dayStrip">{week.map(day => {
+          const [dow, date] = day.label.split(' ');
+          const today = isToday(day);
+          return <button className={day.dayNumber === selectedDay ? 'active' : ''} key={day.id} onClick={() => onSelectDay(day.dayNumber)}><b>{dow}</b><span>{date}</span>{today && <i aria-hidden="true" />}</button>;
+        })}</div>
         <button className="ghostIcon" onClick={() => onShift(1)}><Icon name="chevronRight" /></button>
+        <div className="stripActions">
+          <span className="weekLabel">{weekRange(week)}</span>
+          {onAdd && <button className="compactAction" onClick={onAdd}><Icon name="plus" /> Add</button>}
+          {onAdapt && <button className="compactAction brand" onClick={onAdapt}><Icon name="ai" /> Adapt</button>}
+        </div>
       </div>
-      <div className="dayStrip">{week.map(day => {
-        const [dow, date] = day.label.split(' ');
-        return <button className={day.dayNumber === selectedDay ? 'active' : ''} key={day.id} onClick={() => onSelectDay(day.dayNumber)}><b>{dow}</b><span>{date}</span></button>;
-      })}</div>
     </div>
   );
 }
@@ -492,6 +511,12 @@ function weekRange(week) {
   const b = dateForDay(week[week.length - 1].dayNumber);
   const month = a.toLocaleDateString('en-US', { month: 'short' });
   return `${month} ${a.getDate()}–${b.getDate()}`;
+}
+
+function isToday(day) {
+  const date = dateForDay(day.dayNumber);
+  const today = new Date();
+  return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
 }
 
 function agendaItems(day, activities) {
