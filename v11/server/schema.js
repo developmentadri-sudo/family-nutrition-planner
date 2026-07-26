@@ -152,17 +152,64 @@ function profileMealNote(profile, meal) {
 
   if (alternative) notes.push(alternative);
 
-  if (/lactose|dairy/.test(context) && /yogurt|cheese|milk/.test(title)) notes.push('Use lactose-free dairy or swap to eggs/soy yogurt.');
-  if (/gluten|celiac/.test(context) && /toast|bread|pasta|sourdough/.test(title)) notes.push('Use gluten-free bread or pasta.');
-  if (/nut|walnut|almond/.test(context) && /walnut|almond|nuts/.test(title)) notes.push('Replace nuts with seeds or fruit.');
+  if (/lactose|dairy/.test(context) && /yogurt|cheese|milk/.test(title)) notes.push(dairySwapForMeal(title));
+  if (/gluten|celiac/.test(context) && /toast|bread|pasta|sourdough/.test(title)) notes.push(glutenSwapForMeal(title));
+  if (/nut|walnut|almond/.test(context) && /walnut|almond|nuts/.test(title)) notes.push(nutSwapForMeal(title));
   if (/fish|seafood/.test(context) && /salmon|hake|cod|prawn|bonito|tuna/.test(title)) notes.push('Replace fish with eggs, tofu or legumes.');
   if (/egg/.test(context) && /egg|omelette/.test(title)) notes.push('Use tofu scramble or a fish/chicken portion instead.');
-  if (/gut|reflux|gallbladder|bloat/.test(context)) notes.push('Keep fat moderate, seasoning gentle and portions slightly smaller.');
-  if (/performance|basketball|padel|gym|active|training|run/.test(context)) notes.push(/rice|potato|pasta|toast|oat/.test(title) ? 'Keep the carb base and scale portion around training.' : 'Add an easy carb side if this is near training.');
-  if (/weight|lean|lose/.test(context)) notes.push('Prioritize protein and vegetables; keep the carb portion moderate.');
-  if (/hair/.test(context)) notes.push('Keep protein plus fruit, nuts or omega-rich add-ons when tolerated.');
+  if (/gut|reflux|gallbladder|bloat/.test(context)) notes.push(gutNoteForMeal(title, meal.type));
+  if (/performance|basketball|padel|gym|active|training|run/.test(context)) notes.push(performanceNoteForMeal(title, meal.type));
+  if (/weight|lean|lose/.test(context)) notes.push(weightNoteForMeal(title, meal.type));
+  if (/hair/.test(context)) notes.push(hairNoteForMeal(title, meal.type));
 
   return notes.slice(0, 3).join(' ') || 'Family default: adjust portion to appetite, goal and activity.';
+}
+
+function dairySwapForMeal(title) {
+  if (/yogurt|kefir/i.test(title)) return 'Use lactose-free Greek yogurt or soy yogurt; keep the same fruit topping.';
+  if (/cheese/i.test(title)) return 'Use lactose-free cheese or replace it with egg, hummus or tofu.';
+  return 'Use lactose-free dairy or a non-dairy base.';
+}
+
+function glutenSwapForMeal(title) {
+  if (/toast|sourdough|bread/i.test(title)) return 'Use gluten-free toast and keep the same toppings.';
+  if (/pasta/i.test(title)) return 'Use gluten-free pasta and keep the same sauce/protein.';
+  return 'Use the gluten-free version of the carb base.';
+}
+
+function nutSwapForMeal(title) {
+  if (/walnut|almond/i.test(title)) return 'Swap nuts for pumpkin seeds, chia or extra berries.';
+  return 'Replace nuts with seeds or fruit.';
+}
+
+function gutNoteForMeal(title, type) {
+  if (/salmon|hake|cod|tuna|bonito/i.test(title)) return 'Keep the fish portion moderate, choose plain rice or potato, and add cucumber, carrots or zucchini instead of heavy sauces.';
+  if (/omelette|egg/i.test(title)) return 'Keep the omelette lightly cooked with spinach or zucchini; avoid onion-heavy sides.';
+  if (/yogurt|kefir/i.test(title)) return 'Use lactose-free yogurt, keep berries moderate, and skip extra nuts if digestion feels sensitive.';
+  if (type === 'snack') return 'Keep the snack simple: fruit first, with seeds or nuts only if well tolerated.';
+  return 'Keep seasoning gentle, fat moderate, and add a cooked vegetable side.';
+}
+
+function performanceNoteForMeal(title, type) {
+  if (/rice|potato|pasta|toast|oat|porridge/i.test(title)) return 'Keep the carb base; add a little extra rice, potato or toast when training is within a few hours.';
+  if (/salmon|hake|cod|egg|tofu|lentil|chickpea|bean/i.test(title)) return 'Keep the protein, and pair it with rice, potato or bread if this is close to training.';
+  if (type === 'snack') return 'Use this as a pre-session bite: banana, rice cakes or fruit work better than a heavy portion.';
+  return 'Add an easy carb side if this is near training.';
+}
+
+function weightNoteForMeal(title, type) {
+  if (/rice|pasta|potato/i.test(title)) return 'Keep the same dish, but use a smaller carb portion and add extra vegetables or salad.';
+  if (/yogurt|snack/i.test(`${title} ${type}`)) return 'Keep protein steady and use fruit as the main add-on, with nuts measured.';
+  return 'Keep protein central, double the vegetables, and moderate added fats.';
+}
+
+function hairNoteForMeal(title, type) {
+  if (/salmon|tuna|bonito/i.test(title)) return 'Pair the fish with strawberries, kiwi or blueberries for vitamin C; add walnuts only if tolerated.';
+  if (/egg|omelette/i.test(title)) return 'Add spinach or tomato on the side, plus kiwi or berries later in the day.';
+  if (/yogurt|kefir/i.test(title)) return 'Use berries or kiwi as the topping, with chia or walnuts if tolerated.';
+  if (/walnut|almond|nuts/i.test(title)) return 'Keep the nuts portion and pair it with kiwi, strawberries or blueberries.';
+  if (type === 'snack') return 'Choose fruit with seeds or walnuts to support micronutrients without making it heavy.';
+  return 'Add vitamin-C fruit and a tolerated omega-rich topping or seed side.';
 }
 
 function alternativeForProfile(profile, meal) {
