@@ -56,7 +56,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .aiPanel { display: grid; gap: 10px; }
 .profile { grid-column: span 4; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .profile label:nth-last-child(-n + 3) { grid-column: 1 / -1; }
-.avatar { width: 38px; height: 38px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: var(--card-2); border: 1px solid var(--line); color: var(--accent); font-weight: 760; }
+.avatar { width: 38px; height: 38px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: var(--card-2); border: 1px solid var(--line); color: var(--accent); font-weight: 760; line-height: 1; box-sizing: border-box; padding-top: 2px; }
 .pill { display: inline-flex; border-radius: 999px; border: 1px solid var(--line); padding: 5px 10px; font-size: 12px; font-weight: 650; background: rgba(255, 255, 255, .25); }
 .pill.blue { color: var(--blue); border-color: rgba(116, 167, 255, .36); }
 .pill.purple { color: var(--purple); border-color: rgba(197, 156, 255, .42); }
@@ -97,7 +97,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .adaptBox { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .timingChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .timingChip { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; max-width: 280px; min-width: 190px; border: .5px solid var(--line); border-radius: 999px; background: var(--surface-1); padding: 6px 10px 6px 6px; }
-.chipAvatar { width: 28px; height: 28px; border-radius: 999px; display: inline-grid; place-items: center; flex: 0 0 28px; background: rgba(85, 214, 176, .14); color: var(--accent); font-size: 12px; font-weight: 760; line-height: 1; text-align: center; padding: 0; }
+.chipAvatar { width: 28px; height: 28px; border-radius: 999px; display: inline-grid; place-items: center; flex: 0 0 28px; background: rgba(85, 214, 176, .14); color: var(--accent); font-size: 12px; font-weight: 760; line-height: 1; text-align: center; box-sizing: border-box; padding: 2px 0 0; }
 .timingChip:nth-child(2n) .chipAvatar { background: var(--pro-bg); color: var(--pro-text); }
 .timingChip b, .timingChip span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timingChip b { font-size: 12px; font-weight: 620; }
