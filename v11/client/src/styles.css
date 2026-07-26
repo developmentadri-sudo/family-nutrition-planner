@@ -97,7 +97,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .adaptBox { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .timingChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .timingChip { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; max-width: 280px; min-width: 190px; border: .5px solid var(--line); border-radius: 999px; background: var(--surface-1); padding: 6px 10px 6px 6px; }
-.chipAvatar { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; background: rgba(85, 214, 176, .14); color: var(--accent); font-size: 12px; font-weight: 760; line-height: 1; text-align: center; }
+.chipAvatar { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; background: rgba(85, 214, 176, .14); color: var(--accent); font-size: 12px; font-weight: 760; line-height: 28px; text-align: center; padding: 0; }
 .timingChip:nth-child(2n) .chipAvatar { background: var(--pro-bg); color: var(--pro-text); }
 .timingChip b, .timingChip span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timingChip b { font-size: 12px; font-weight: 620; }

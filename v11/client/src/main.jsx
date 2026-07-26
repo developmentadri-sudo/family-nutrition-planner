@@ -285,7 +285,7 @@ function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembe
           {menuOpen && <div className="actionMenu">
             <button onClick={() => choose(onSwap)}><Icon name="swap" /> Swap meal</button>
             <button onClick={() => choose(() => { setAdaptOpen(true); onToggle(); })}><Icon name="ai" /> Suggest variation</button>
-            <button onClick={() => choose(onMembers)}><Icon name="user" /> User-specific adjustments</button>
+            <button onClick={() => choose(onMembers)}><Icon name="user" /> User specifics</button>
             <button onClick={() => choose(onSymptom)}><Icon name="symptom" /> Log symptoms</button>
           </div>}
         </div>
@@ -328,7 +328,7 @@ function SwapDrawer({ meal, plan, onChoose, onClose }) {
 
 function MemberDrawer({ meal, family, onClose }) {
   const notes = memberNotesForMeal(meal, family.profiles || []);
-  return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>Member Specifics</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><div className="memberList">{notes.map(item => <section className="memberNote" key={item.profileId}><div className="avatar">{item.name?.slice(0, 2).toUpperCase() || 'P'}</div><div><h3>{item.name}</h3><p>{item.note}</p></div></section>)}</div></aside></div>;
+  return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>User Specifics</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><div className="memberList">{notes.map(item => <section className="memberNote" key={item.profileId}><div className="avatar">{item.name?.slice(0, 2).toUpperCase() || 'P'}</div><div><h3>{item.name}</h3><p>{item.note}</p></div></section>)}</div></aside></div>;
 }
 
 function SymptomDialog({ meal, family, onSave, onClose }) {
