@@ -201,10 +201,10 @@ function Week({ plan, selectedDay, onSelectDay }) {
 
 function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal, onAdaptDay, onSwapMeal, onLogSymptom, onAddActivity, onUpdateActivity, onDeleteActivity }) {
   const [open, setOpen] = useState({});
+  const [memberOpen, setMemberOpen] = useState({});
   const [notes, setNotes] = useState({});
   const [swapMeal, setSwapMeal] = useState(null);
   const [symptomMeal, setSymptomMeal] = useState(null);
-  const [memberMeal, setMemberMeal] = useState(null);
   const [eventOpen, setEventOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const weekNumber = weekOf(selectedDay);
@@ -222,9 +222,8 @@ function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal
       <div className="toolbar"><div><h2>{day.label}</h2></div><div className="toolbarActions"><button onClick={() => setEventOpen(true)}><Icon name="plus" /> Add event</button><button onClick={() => onAdaptDay(selectedDay)}><Icon name="ai" /> Adapt day</button></div></div>
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
-        : <MealCard key={item.id} meal={item} open={!!open[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberMeal(item)} onSymptom={() => setSymptomMeal(item)} />)}</div>
+        : <MealCard key={item.id} meal={item} family={family} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} />)}</div>
       {swapMeal && <SwapDrawer meal={swapMeal} plan={plan} onClose={() => setSwapMeal(null)} onChoose={targetId => { onSwapMeal(swapMeal, targetId); setSwapMeal(null); }} />}
-      {memberMeal && <MemberDrawer meal={memberMeal} family={family} onClose={() => setMemberMeal(null)} />}
       {symptomMeal && <SymptomDialog meal={symptomMeal} family={family} onClose={() => setSymptomMeal(null)} onSave={payload => { onLogSymptom(payload); setSymptomMeal(null); }} />}
       {eventOpen && <EventDialog dayNumber={selectedDay} family={family} onClose={() => setEventOpen(false)} onSave={payload => { onAddActivity(payload); setEventOpen(false); }} />}
       {editingEvent && <EventDialog dayNumber={selectedDay} family={family} activity={editingEvent} onClose={() => setEditingEvent(null)} onSave={payload => { onUpdateActivity(editingEvent.id, payload); setEditingEvent(null); }} />}
@@ -248,7 +247,7 @@ function WeekSelector({ week, selectedDay, onSelectDay, onShift }) {
   );
 }
 
-function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
+function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
   const split = Array.isArray(meal.memberTimings) && meal.memberTimings.length > 0;
   const [adaptOpen, setAdaptOpen] = useState(open);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -294,6 +293,7 @@ function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembe
         <p>{meal.description}</p>
         <div className="tagRow">{(meal.tags || inferTags(meal.title)).map(tag => <span className={`pill ${tag.tone}`} key={tag.label}>{tag.label}</span>)}</div>
         {split && <div className="timingChips">{meal.memberTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
+        {membersOpen && <UserSpecificsInline meal={meal} family={family} />}
         {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." /><button className="primary" onClick={handleAdapt}>Adapt this meal</button></div>}
       </article>
     </div>
@@ -319,6 +319,20 @@ function ActivityCard({ activity, onEdit, onDelete }) {
 
 function EventTimingChip({ activity, person, onEdit, onDelete }) {
   return <div className="timingChip eventChip"><span className="chipAvatar">{person.profileName?.slice(0, 1).toUpperCase() || 'P'}</span><div><b>{person.profileName || 'Family'} · <em>{activity.time}</em></b><span>Manual event</span></div><div className="eventActions"><button title="Edit event" onClick={event => { event.stopPropagation(); onEdit(person); }}><Icon name="edit" /></button><button title="Remove event" onClick={event => { event.stopPropagation(); onDelete(person.id); }}><Icon name="trash" /></button></div></div>;
+}
+
+function UserSpecificsInline({ meal, family }) {
+  const notes = memberNotesForMeal(meal, family.profiles || []);
+  return (
+    <div className="inlineSpecifics">
+      {notes.map(item => (
+        <section className="specificChip" key={item.profileId}>
+          <span className="chipAvatar">{item.name?.slice(0, 1).toUpperCase() || 'P'}</span>
+          <div><b>{item.name}</b><span>{item.note}</span></div>
+        </section>
+      ))}
+    </div>
+  );
 }
 
 function SwapDrawer({ meal, plan, onChoose, onClose }) {
@@ -349,10 +363,12 @@ function EventDialog({ dayNumber, family, activity, onSave, onClose }) {
 function memberNotesForMeal(meal, profiles) {
   return profiles.map(profile => {
     const saved = (meal.memberNotes || []).find(item => item.profileId === profile.id || item.name === profile.name);
+    const local = localProfileNote(profile, meal);
+    const note = local.startsWith('Family default') && saved?.note ? saved.note : local;
     return {
       profileId: profile.id,
       name: profile.name,
-      note: saved?.note || localProfileNote(profile, meal)
+      note: saved?.note && !saved.note.startsWith('Family default') && !note.includes(saved.note) ? `${note} ${saved.note}` : note
     };
   });
 }
@@ -361,12 +377,48 @@ function localProfileNote(profile, meal) {
   const context = `${profile.goal || ''} ${profile.restrictions || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
   const title = (meal.title || '').toLowerCase();
   const notes = [];
+  const alternative = profileAlternative(profile, meal);
+  if (alternative) notes.push(alternative);
   if (/lactose|dairy/.test(context) && /yogurt|cheese|milk/.test(title)) notes.push('Use lactose-free dairy or a non-dairy base.');
   if (/gluten|celiac/.test(context) && /toast|bread|pasta|sourdough/.test(title)) notes.push('Use gluten-free bread or pasta.');
   if (/nut|walnut|almond/.test(context) && /walnut|almond|nuts/.test(title)) notes.push('Replace nuts with seeds or fruit.');
   if (/gut|reflux|gallbladder|bloat/.test(context)) notes.push('Keep fat moderate and seasoning gentle.');
   if (/basketball|padel|gym|active|training|performance/.test(context)) notes.push('Scale carbohydrates around the training window.');
   return notes.join(' ') || 'Family default: adjust portion to appetite, goal and activity.';
+}
+
+function profileAlternative(profile, meal) {
+  const context = `${profile.goal || ''} ${profile.restrictions || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
+  const title = meal.title || '';
+  const text = title.toLowerCase();
+  const diet = /vegan/.test(context) ? 'vegan' : /vegetarian/.test(context) ? 'vegetarian' : /pescetarian/.test(context) ? 'pescetarian' : 'omnivore';
+  const hasFish = /salmon|hake|cod|prawn|bonito|tuna|fish|seafood/.test(text);
+  const hasMeat = /chicken|turkey|meat|beef|pork|ham/.test(text);
+  const hasEggDairy = /egg|omelette|yogurt|cheese|milk|kefir/.test(text);
+  const wantsMeat = /meat|chicken|turkey|animal protein/.test(context) && diet === 'omnivore';
+  if (diet === 'vegan' && (hasFish || hasMeat || hasEggDairy)) return `Use ${profileAlternativeTitle(title, meal.type, 'vegan')} for this profile, keeping the same base and timing.`;
+  if (diet === 'vegetarian' && (hasFish || hasMeat)) return `Use ${profileAlternativeTitle(title, meal.type, 'vegetarian')} for this profile, keeping the same base and timing.`;
+  if (diet === 'pescetarian' && hasMeat) return `Use ${profileAlternativeTitle(title, meal.type, 'pescetarian')} for this profile, keeping the same base and timing.`;
+  if (wantsMeat && !hasFish && !hasMeat && /lentil|chickpea|bean|tofu|egg|vegetable|rice|quinoa|potato|pasta/.test(text)) return `Optional add-on: chicken or turkey portion for this profile, while the family base stays ${title}.`;
+  return '';
+}
+
+function profileAlternativeTitle(title, type, diet) {
+  const text = title.toLowerCase();
+  if (diet === 'vegan') {
+    if (/rice/.test(text)) return 'tofu rice bowl';
+    if (/quinoa/.test(text)) return 'chickpea quinoa bowl';
+    if (/potato/.test(text)) return 'bean potato plate';
+    if (/pasta/.test(text)) return 'lentil pasta bowl';
+    if (type === 'breakfast') return 'soy yogurt bowl or oat porridge';
+    if (type === 'snack') return 'fruit with seeds';
+    return 'tofu or legumes';
+  }
+  if (/rice/.test(text)) return diet === 'pescetarian' ? 'salmon or tuna rice bowl' : 'tofu or egg rice bowl';
+  if (/potato/.test(text)) return diet === 'pescetarian' ? 'hake potato plate' : 'egg or bean potato plate';
+  if (/quinoa/.test(text)) return 'chickpea quinoa bowl';
+  if (/pasta/.test(text)) return 'lentil pasta bowl';
+  return diet === 'pescetarian' ? 'fish, eggs or legumes' : 'eggs, tofu or legumes';
 }
 
 function MealEmoji({ meal }) {

@@ -28,6 +28,13 @@ export async function adaptMealWithAi(plan, mealId, payload) {
   const meal = plan.days.flatMap(day => day.meals).find(item => item.id === mealId);
   if (!meal) throw new Error('Meal not found.');
 
+  if (isSmallMealEdit(payload.note || '')) {
+    return {
+      aiUsed: false,
+      plan: mergeMealUpdate(plan, mealId, createSmallMealEdit(meal, payload, payload.note || 'make a small adjustment', payload.family?.profiles || []))
+    };
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     return {
       aiUsed: false,

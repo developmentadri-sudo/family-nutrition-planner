@@ -109,6 +109,11 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .eventActions button { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); background: transparent; border-color: transparent; }
 .eventActions button:hover, .eventActions button:focus-visible { background: var(--card); box-shadow: none; }
 .eventActions .icon { width: 14px; height: 14px; }
+.inlineSpecifics { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.specificChip { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; align-items: center; border: .5px solid var(--line); border-radius: 18px; background: var(--surface-1); padding: 8px; }
+.specificChip b, .specificChip span { display: block; min-width: 0; }
+.specificChip b { font-size: 12px; font-weight: 650; }
+.specificChip span { color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 2px; }
 .weekGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .weekCard { display: grid; gap: 8px; text-align: left; border-radius: 18px; padding: 14px; background: var(--card); }
 .weekCard.active { background: var(--card-2); border-color: var(--accent); color: var(--ink); }

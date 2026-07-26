@@ -148,6 +148,9 @@ function profileMealNote(profile, meal) {
   const context = `${profile.goal || ''} ${profile.restrictions || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
   const title = (meal.title || '').toLowerCase();
   const notes = [];
+  const alternative = alternativeForProfile(profile, meal);
+
+  if (alternative) notes.push(alternative);
 
   if (/lactose|dairy/.test(context) && /yogurt|cheese|milk/.test(title)) notes.push('Use lactose-free dairy or swap to eggs/soy yogurt.');
   if (/gluten|celiac/.test(context) && /toast|bread|pasta|sourdough/.test(title)) notes.push('Use gluten-free bread or pasta.');
@@ -160,6 +163,64 @@ function profileMealNote(profile, meal) {
   if (/hair/.test(context)) notes.push('Keep protein plus fruit, nuts or omega-rich add-ons when tolerated.');
 
   return notes.slice(0, 3).join(' ') || 'Family default: adjust portion to appetite, goal and activity.';
+}
+
+function alternativeForProfile(profile, meal) {
+  const context = `${profile.goal || ''} ${profile.restrictions || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
+  const title = String(meal.title || '');
+  const type = meal.type || 'lunch';
+  const diet = profileDietMode(context);
+  const hasFish = /salmon|hake|cod|prawn|bonito|tuna|fish|seafood/i.test(title);
+  const hasMeat = /chicken|turkey|meat|beef|pork|ham/i.test(title);
+  const hasEggDairy = /egg|omelette|yogurt|cheese|milk|kefir/i.test(title);
+  const wantsMeat = /meat|chicken|turkey|animal protein/.test(context) && diet === 'omnivore';
+
+  if (diet === 'vegan' && (hasFish || hasMeat || hasEggDairy)) {
+    return `Use ${veganAlternative(title, type)} for this profile, keeping the same base and timing.`;
+  }
+  if (diet === 'vegetarian' && (hasFish || hasMeat)) {
+    return `Use ${vegetarianAlternative(title, type)} for this profile, keeping the same base and timing.`;
+  }
+  if (diet === 'pescetarian' && hasMeat) {
+    return `Use ${pescetarianAlternative(title, type)} for this profile, keeping the same base and timing.`;
+  }
+  if (wantsMeat && !hasFish && !hasMeat && /lentil|chickpea|bean|tofu|egg|vegetable|rice|quinoa|potato|pasta/i.test(title)) {
+    return `Optional add-on: chicken or turkey portion for this profile, while the family base stays ${title}.`;
+  }
+  return '';
+}
+
+function profileDietMode(context) {
+  if (/vegan/.test(context)) return 'vegan';
+  if (/vegetarian/.test(context)) return 'vegetarian';
+  if (/pescetarian/.test(context)) return 'pescetarian';
+  return 'omnivore';
+}
+
+function veganAlternative(title, type) {
+  if (/rice/i.test(title)) return 'tofu rice bowl';
+  if (/quinoa/i.test(title)) return 'chickpea quinoa bowl';
+  if (/potato/i.test(title)) return 'bean potato plate';
+  if (/pasta/i.test(title)) return 'lentil pasta bowl';
+  if (type === 'breakfast') return 'soy yogurt bowl or oat porridge';
+  if (type === 'snack') return 'fruit with seeds';
+  return 'tofu or legumes';
+}
+
+function vegetarianAlternative(title, type) {
+  if (/rice/i.test(title)) return 'tofu or egg rice bowl';
+  if (/quinoa/i.test(title)) return 'chickpea quinoa bowl';
+  if (/potato/i.test(title)) return 'egg or bean potato plate';
+  if (/pasta/i.test(title)) return 'lentil pasta bowl';
+  if (type === 'snack') return 'cheese, yogurt, fruit or seeds';
+  return 'eggs, tofu or legumes';
+}
+
+function pescetarianAlternative(title, type) {
+  if (/rice/i.test(title)) return 'salmon or tuna rice bowl';
+  if (/potato/i.test(title)) return 'hake potato plate';
+  if (type === 'snack') return 'fruit, yogurt or seeds';
+  return 'fish, eggs or legumes';
 }
 
 function describeMeal(title, type) {
@@ -181,10 +242,11 @@ function mealForFamily(type, index, family) {
 }
 
 function householdDietMode(profiles) {
-  const text = profiles.map(profile => `${profile.goal || ''} ${profile.restrictions || ''} ${profile.preferences || ''}`).join(' ').toLowerCase();
-  if (/vegan/.test(text)) return 'vegan';
-  if (/vegetarian/.test(text)) return 'vegetarian';
-  if (/pescetarian/.test(text)) return 'pescetarian';
+  if (!profiles.length) return 'omnivore';
+  const modes = profiles.map(profile => profileDietMode(`${profile.goal || ''} ${profile.restrictions || ''} ${profile.preferences || ''}`.toLowerCase()));
+  if (modes.every(mode => mode === 'vegan')) return 'vegan';
+  if (modes.every(mode => mode === 'vegan' || mode === 'vegetarian')) return 'vegetarian';
+  if (modes.every(mode => mode === 'vegan' || mode === 'vegetarian' || mode === 'pescetarian')) return 'pescetarian';
   return 'omnivore';
 }
 
