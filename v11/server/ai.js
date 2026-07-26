@@ -44,10 +44,12 @@ export async function adaptMealWithAi(plan, mealId, payload) {
 
   const prompt = buildMealPrompt(plan, meal, payload);
   const update = await callOpenAI(prompt);
+  const memberTimings = createMemberTimings(meal, payload);
   return {
     aiUsed: true,
     plan: mergeMealUpdate(plan, mealId, {
       ...update,
+      memberTimings,
       tags: update.tags || inferTags(update.title || meal.title),
       icon: update.icon || mealIcon(update.title || meal.title, meal.type),
       memberNotes: update.memberNotes || createMemberNotes(payload.family?.profiles || [], { ...meal, ...update })
@@ -287,7 +289,7 @@ function createMemberTimings(meal, payload) {
   if (!profiles.length) return [];
 
   const timings = profiles.map(profile => {
-    const event = events.find(item => item.profileId === profile.id);
+    const event = events.find(item => sameProfileEvent(item, profile));
     if (!event) return { profileId: profile.id, name: profile.name, time: meal.time, note: 'Family default.' };
     const mealMinutes = toMinutes(meal.time);
     const eventMinutes = toMinutes(event.time);
@@ -310,6 +312,15 @@ function createMemberTimings(meal, payload) {
 function payloadActivitiesForMeal(plan, meal, { activities = [], dayNumber } = {}) {
   const mealDay = dayNumber || Number(meal.id.match(/^day-(\d+)-/)?.[1]);
   return activities.filter(activity => Number(activity.dayNumber) === mealDay);
+}
+
+function sameProfileEvent(event, profile) {
+  if (event.profileId && event.profileId === profile.id) return true;
+  return normalizeName(event.profileName) && normalizeName(event.profileName) === normalizeName(profile.name);
+}
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase();
 }
 
 function eventsFromNote(note, profiles, dayNumber) {
