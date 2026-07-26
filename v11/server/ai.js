@@ -1,11 +1,12 @@
-import { createMemberNotes, createStarterPlan, inferTags, mealIcon, mergeMealUpdate, normalizeAiPlan } from './schema.js';
+import { createMemberNotes, createStarterPlan, inferTags, mealIcon, mergeMealUpdate, normalizeAiPlan, sanitizePlanForFamily } from './schema.js';
 
 const endpoint = 'https://api.openai.com/v1/responses';
 const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 
 export async function generatePlanWithAi(payload) {
   if (!process.env.OPENAI_API_KEY) {
-    return { aiUsed: false, plan: createStarterPlan({ ...payload, source: 'local' }) };
+    const plan = createStarterPlan({ ...payload, source: 'local' });
+    return { aiUsed: false, plan: sanitizePlanForFamily(plan, payload.family) };
   }
 
   const prompt = buildPlanPrompt(payload);
@@ -20,7 +21,7 @@ export async function generatePlanWithAi(payload) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   }, fallbackPlan);
-  return { aiUsed: true, plan };
+  return { aiUsed: true, plan: sanitizePlanForFamily(plan, payload.family) };
 }
 
 export async function adaptMealWithAi(plan, mealId, payload) {
@@ -109,6 +110,7 @@ User request: ${note || 'Adapt this meal while preserving the family routine.'}`
 function createLocalMealUpdate(meal, payload) {
   const note = payload.note || 'make this meal easier for today';
   const profiles = payload.family?.profiles || [];
+  if (isSmallMealEdit(note)) return createSmallMealEdit(meal, payload, note, profiles);
   const title = chooseLocalTitle(meal, note, payload.family);
   return {
     title,
@@ -120,6 +122,44 @@ function createLocalMealUpdate(meal, payload) {
     memberNotes: createMemberNotes(profiles, { ...meal, title }),
     previousTitles: uniqueTitles([...(meal.previousTitles || []), meal.title, meal.swappedFromTitle, title])
   };
+}
+
+function isSmallMealEdit(note) {
+  return /\b(add|extra|more|include|with|side|side dish|veggies|vegetables|greens|salad|fruit|seeds|nuts|sauce|topping|portion|smaller|bigger|less|only|slight|slightly|keep|same|main shape)\b/i.test(note);
+}
+
+function createSmallMealEdit(meal, payload, note, profiles) {
+  const addition = sideDishPhrase(note);
+  const description = withSentence(
+    meal.description || describeLocalAdaptation(meal.title, meal.type),
+    addition
+  );
+  return {
+    title: meal.title,
+    description,
+    reason: `Adjusted this ${meal.type}: ${note}`,
+    memberTimings: createMemberTimings(meal, payload),
+    tags: meal.tags?.length ? meal.tags : inferTags(meal.title),
+    icon: meal.icon || mealIcon(meal.title, meal.type),
+    memberNotes: createMemberNotes(profiles, meal),
+    previousTitles: uniqueTitles([...(meal.previousTitles || []), meal.title, meal.swappedFromTitle])
+  };
+}
+
+function sideDishPhrase(note) {
+  const text = note.toLowerCase();
+  if (/veggie|vegetable|greens|salad/.test(text)) return 'Add a simple vegetable side while keeping the main dish unchanged.';
+  if (/fruit|berry|banana|kiwi|apple/.test(text)) return 'Add fruit as the small side or topping while keeping the base meal unchanged.';
+  if (/seed|nut|walnut|almond/.test(text)) return 'Adjust the topping with tolerated seeds or nuts while keeping the base meal unchanged.';
+  if (/portion|smaller|bigger|less|more/.test(text)) return 'Adjust portions by person while keeping the recipe structure unchanged.';
+  if (/side/.test(text)) return 'Change only the side dish and keep the main meal unchanged.';
+  return 'Make a small adjustment and keep the main meal unchanged.';
+}
+
+function withSentence(description, sentence) {
+  const base = String(description || '').trim();
+  if (!base) return sentence;
+  return base.includes(sentence) ? base : `${base} ${sentence}`;
 }
 
 function chooseLocalTitle(meal, note, family) {

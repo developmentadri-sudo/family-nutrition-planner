@@ -51,6 +51,7 @@ function App() {
 
   async function generatePlan(note = '') {
     setStatus('Generating 28-day routine...');
+    await api.saveFamily(family);
     const result = await api.generatePlan({ family, note });
     setPlan(result.plan);
     setSelectedDay(result.plan.days[0]?.dayNumber || 1);

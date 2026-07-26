@@ -40,11 +40,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && route === '/plans/generate') {
-      const { plan, aiUsed } = await generatePlanWithAi(body);
+      const current = await readStore();
+      const family = normalizeFamily(body.family || current.family);
+      const { plan, aiUsed } = await generatePlanWithAi({ ...body, family });
+      const safePlan = sanitizePlanForFamily(plan, family);
       const store = await updateStore(current => ({
         ...current,
-        family: normalizeFamily(body.family || current.family),
-        plans: [plan, ...current.plans.map(item => ({ ...item, status: 'archived' }))],
+        family,
+        plans: [safePlan, ...current.plans.map(item => ({ ...item, status: 'archived' }))],
         aiRequests: [{ id: `ai-${Date.now()}`, type: 'generate-plan', aiUsed, createdAt: new Date().toISOString(), note: body.note || '' }, ...current.aiRequests]
       }));
       return send(res, 200, { plan: store.plans[0], aiUsed });
@@ -57,9 +60,10 @@ const server = createServer(async (req, res) => {
       const plan = store.plans.find(item => item.id === planId);
       if (!plan) return send(res, 404, { error: 'Plan not found.' });
       const result = await adaptMealWithAi(plan, mealId, { ...body, activities: store.activities || [] });
+      const safePlan = sanitizePlanForFamily(result.plan, body.family || store.family);
       const next = await updateStore(current => ({
         ...current,
-        plans: current.plans.map(item => item.id === planId ? result.plan : item),
+        plans: current.plans.map(item => item.id === planId ? safePlan : item),
         aiRequests: [{ id: `ai-${Date.now()}`, type: 'adapt-meal', aiUsed: result.aiUsed, mealId, createdAt: new Date().toISOString(), note: body.note || '' }, ...current.aiRequests]
       }));
       return send(res, 200, { plan: next.plans.find(item => item.id === planId), aiUsed: result.aiUsed });
@@ -71,7 +75,7 @@ const server = createServer(async (req, res) => {
       const store = await readStore();
       const plan = store.plans.find(item => item.id === planId);
       if (!plan) return send(res, 404, { error: 'Plan not found.' });
-      const nextPlan = swapMeals(plan, mealId, body.targetMealId);
+      const nextPlan = sanitizePlanForFamily(swapMeals(plan, mealId, body.targetMealId), store.family);
       const next = await updateStore(current => ({
         ...current,
         plans: current.plans.map(item => item.id === planId ? nextPlan : item)
@@ -86,9 +90,10 @@ const server = createServer(async (req, res) => {
       const plan = store.plans.find(item => item.id === planId);
       if (!plan) return send(res, 404, { error: 'Plan not found.' });
       const result = await adaptDayWithAi(plan, dayNumber, { ...body, activities: store.activities || [] });
+      const safePlan = sanitizePlanForFamily(result.plan, body.family || store.family);
       const next = await updateStore(current => ({
         ...current,
-        plans: current.plans.map(item => item.id === planId ? result.plan : item),
+        plans: current.plans.map(item => item.id === planId ? safePlan : item),
         aiRequests: [{ id: `ai-${Date.now()}`, type: 'adapt-day', aiUsed: result.aiUsed, dayNumber: Number(dayNumber), createdAt: new Date().toISOString(), note: body.note || '' }, ...current.aiRequests]
       }));
       return send(res, 200, { plan: next.plans.find(item => item.id === planId), aiUsed: result.aiUsed });
