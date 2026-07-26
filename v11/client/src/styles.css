@@ -58,11 +58,6 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .viewToggle { display: inline-flex; gap: 2px; padding: 3px; border: .5px solid var(--border); border-radius: 999px; background: var(--surface-1); }
 .viewToggle button { min-width: 58px; border: .5px solid transparent; background: transparent; color: var(--text-secondary); box-shadow: none; padding: 7px 12px; }
 .viewToggle button.active { background: var(--surface-2); border-color: var(--border); color: var(--text-primary); box-shadow: 0 2px 6px rgba(54, 45, 32, .06); }
-.familyAvatars { display: flex; align-items: center; padding-left: 2px; }
-.familyAvatar { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-accent); color: var(--text-accent); box-shadow: none; }
-.familyAvatar + .familyAvatar { margin-left: -8px; border: 2px solid var(--surface-0); }
-.familyAvatar.avatarTone2 { background: var(--pro-bg); color: var(--pro-text); }
-.familyAvatar.avatarTone3 { background: rgba(85, 214, 176, .14); color: var(--muted); }
 .shell { display: grid; gap: 14px; padding-bottom: 60px; }
 .status { font-size: 13px; }
 .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
@@ -76,6 +71,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .profile label:nth-last-child(-n + 3) { grid-column: 1 / -1; }
 .avatar { width: 38px; height: 38px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: var(--card-2); border: 1px solid var(--line); color: var(--accent); font-weight: 760; line-height: 1; box-sizing: border-box; }
 .avatarLetter { display: block; line-height: 1; transform: translateY(8px); }
+.profile .avatarLetter, .memberNote .avatarLetter { transform: translateY(2px); }
 .pill { display: inline-flex; border-radius: 999px; border: 1px solid var(--line); padding: 5px 10px; font-size: 12px; font-weight: 650; background: rgba(255, 255, 255, .25); }
 .pill.blue { color: var(--blue); border-color: rgba(116, 167, 255, .36); }
 .pill.purple { color: var(--purple); border-color: rgba(197, 156, 255, .42); }

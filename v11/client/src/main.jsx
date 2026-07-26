@@ -132,18 +132,7 @@ function App() {
             <div className="viewToggle" aria-label="View mode">
               <button className={activeTab === 'Today' ? 'active' : ''} onClick={() => setActiveTab('Today')}>Day</button>
               <button className={activeTab === 'Week' ? 'active' : ''} onClick={() => setActiveTab('Week')}>Week</button>
-            </div>
-            <div className="familyAvatars" aria-label="Family profiles">
-              {(family.profiles || []).length === 0 && (
-                <button className="familyAvatar avatarTone1" onClick={() => setActiveTab('Profiles')} title="Profiles">
-                  <Icon name="user" />
-                </button>
-              )}
-              {(family.profiles || []).slice(0, 3).map((profile, index) => (
-                <button className={`familyAvatar avatarTone${index + 1}`} key={profile.id} onClick={() => setActiveTab('Profiles')} title={`${profile.name} profile`}>
-                  <span className="avatarLetter">{profile.name?.slice(0, 1).toUpperCase() || 'P'}</span>
-                </button>
-              ))}
+              <button className={activeTab === 'Profiles' ? 'active' : ''} onClick={() => setActiveTab('Profiles')}>Profiles</button>
             </div>
           </div>
         </div>
