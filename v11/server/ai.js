@@ -1,0 +1,259 @@
+import { createMemberNotes, createStarterPlan, inferTags, mealIcon, mergeMealUpdate, normalizeAiPlan } from './schema.js';
+
+const endpoint = 'https://api.openai.com/v1/responses';
+const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+
+export async function generatePlanWithAi(payload) {
+  if (!process.env.OPENAI_API_KEY) {
+    return { aiUsed: false, plan: createStarterPlan({ ...payload, source: 'local' }) };
+  }
+
+  const prompt = buildPlanPrompt(payload);
+  const json = await callOpenAI(prompt);
+  const fallbackPlan = createStarterPlan({ ...payload, source: 'ai' });
+  const plan = normalizeAiPlan({
+    ...fallbackPlan,
+    ...json,
+    id: `plan-${Date.now()}`,
+    source: 'ai',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }, fallbackPlan);
+  return { aiUsed: true, plan };
+}
+
+export async function adaptMealWithAi(plan, mealId, payload) {
+  const meal = plan.days.flatMap(day => day.meals).find(item => item.id === mealId);
+  if (!meal) throw new Error('Meal not found.');
+
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      aiUsed: false,
+      plan: mergeMealUpdate(plan, mealId, createLocalMealUpdate(meal, payload))
+    };
+  }
+
+  const prompt = buildMealPrompt(plan, meal, payload);
+  const update = await callOpenAI(prompt);
+  return {
+    aiUsed: true,
+    plan: mergeMealUpdate(plan, mealId, {
+      ...update,
+      tags: update.tags || inferTags(update.title || meal.title),
+      icon: update.icon || mealIcon(update.title || meal.title, meal.type),
+      memberNotes: update.memberNotes || createMemberNotes(payload.family?.profiles || [], { ...meal, ...update })
+    })
+  };
+}
+
+export async function adaptDayWithAi(plan, dayNumber, payload) {
+  const day = plan.days.find(item => Number(item.dayNumber) === Number(dayNumber));
+  if (!day) throw new Error('Day not found.');
+
+  let nextPlan = plan;
+  let aiUsed = false;
+  for (const meal of day.meals) {
+    const result = await adaptMealWithAi(nextPlan, meal.id, {
+      ...payload,
+      note: payload.note || 'Adapt the whole day around the scheduled events, timing conflicts and profile needs.'
+    });
+    nextPlan = result.plan;
+    aiUsed = aiUsed || result.aiUsed;
+  }
+  return { aiUsed, plan: nextPlan };
+}
+
+async function callOpenAI(prompt) {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model,
+      input: [
+        { role: 'system', content: 'Return only valid JSON for a family nutrition planner. Do not include diagnosis.' },
+        { role: 'user', content: prompt }
+      ]
+    })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message || `OpenAI request failed with ${response.status}`);
+  const text = data.output_text || data.output?.flatMap(item => item.content || []).map(item => item.text || '').join('') || '';
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('AI response did not include JSON.');
+  return JSON.parse(match[0]);
+}
+
+function buildPlanPrompt({ family, note }) {
+  return `Create a complete 28-day shared family nutrition plan. Include all 28 days and all four meal types per day.
+Return JSON with: {"summary":"...","days":[{"dayNumber":1,"label":"MON 06/07","meals":[{"type":"breakfast","time":"08:00","title":"...","description":"...","reason":"...","tags":[{"label":"Protein","tone":"blue"}],"icon":"bowl","memberNotes":[{"profileId":"...","name":"...","note":"..."}]}]}]}.
+Profiles: ${JSON.stringify(family?.profiles || [])}
+Request: ${note || 'Create the first balanced routine.'}`;
+}
+
+function buildMealPrompt(plan, meal, payload) {
+  const { family, note } = payload;
+  return `Adapt one meal and return JSON with {"title":"...","description":"...","reason":"...","time":"08:00","memberTimings":[{"profileId":"...","name":"...","time":"08:00","note":"..."}],"tags":[{"label":"Protein","tone":"blue"}],"icon":"bowl","memberNotes":[{"profileId":"...","name":"...","note":"..."}]}.
+Current meal: ${JSON.stringify(meal)}
+Current day context: ${JSON.stringify(plan.days.find(day => day.meals.some(item => item.id === meal.id)))}
+Profiles: ${JSON.stringify(family?.profiles || [])}
+Scheduled events: ${JSON.stringify(payloadActivitiesForMeal(plan, meal, { activities: payload.activities || [] }))}
+User request: ${note || 'Adapt this meal while preserving the family routine.'}`;
+}
+
+function createLocalMealUpdate(meal, payload) {
+  const note = payload.note || 'make this meal easier for today';
+  const profiles = payload.family?.profiles || [];
+  const title = chooseLocalTitle(meal, note);
+  return {
+    title,
+    description: describeLocalAdaptation(title, meal.type),
+    reason: `Changed this ${meal.type} because: ${note}`,
+    memberTimings: createMemberTimings(meal, payload),
+    tags: inferTags(title),
+    icon: mealIcon(title, meal.type),
+    memberNotes: createMemberNotes(profiles, { ...meal, title }),
+    previousTitles: uniqueTitles([...(meal.previousTitles || []), meal.title, meal.swappedFromTitle, title])
+  };
+}
+
+function chooseLocalTitle(meal, note) {
+  const text = note.toLowerCase();
+  const alternatives = {
+    breakfast: {
+      noDairy: 'Egg and Avocado Toast',
+      noGluten: 'Lactose-free Yogurt with Kiwi',
+      active: 'Oat Porridge with Banana',
+      light: 'Yogurt with Strawberries',
+      default: 'Lactose-free Greek Yogurt Bowl'
+    },
+    lunch: {
+      noFish: 'Chicken Rice Bowl',
+      noGluten: 'Salmon Rice Bowl',
+      active: 'Salmon Rice Bowl with Extra Potatoes',
+      light: 'Hake with Green Beans',
+      default: 'Prawn Quinoa Bowl'
+    },
+    snack: {
+      noNuts: 'Kiwi and Cured Cheese',
+      noDairy: 'Fruit and Pumpkin Seeds',
+      active: 'Banana and Rice Cakes',
+      light: 'Strawberries',
+      default: 'Kiwi and Walnuts'
+    },
+    dinner: {
+      noFish: 'Spanish Potato Omelette',
+      noGluten: 'Cod with Green Beans',
+      active: 'Rice Omelette with Spinach',
+      light: 'Vegetable Cream with Egg',
+      default: 'Zucchini Omelette'
+    }
+  };
+  const set = alternatives[meal.type] || alternatives.lunch;
+  const candidates = uniqueTitles(Object.values(set));
+  const avoid = [meal.title, meal.swappedFromTitle, ...(meal.previousTitles || [])];
+  if (/no dairy|avoid dairy|lactose|milk|cheese|yogurt/.test(text)) return differentMeal(avoid, set.noDairy, candidates);
+  if (/no gluten|gluten|celiac|bread|pasta/.test(text)) return differentMeal(avoid, set.noGluten, candidates);
+  if (/no fish|avoid fish|salmon|hake|cod|tuna|bonito|prawn/.test(text)) return differentMeal(avoid, set.noFish, candidates);
+  if (/no nut|nut|walnut|almond/.test(text)) return differentMeal(avoid, set.noNuts, candidates);
+  if (/active|training|basketball|padel|gym|run|game|carb|performance/.test(text)) return differentMeal(avoid, set.active, candidates);
+  if (/light|reflux|gut|bloat|tired|late|small/.test(text)) return differentMeal(avoid, set.light, candidates);
+  return candidates.find(candidate => !avoid.some(title => sameMeal(candidate, title))) || candidates.find(candidate => !sameMeal(candidate, meal.title)) || set.default;
+}
+
+function describeLocalAdaptation(title, type) {
+  if (/chicken|salmon|hake|cod|prawn|tuna|bonito/i.test(title)) return 'Shared protein-focused meal with portions and sides adjusted per profile.';
+  if (/oat|rice|potato|banana|toast|pasta/i.test(title)) return 'Higher-energy option for activity, with carb portions scaled by person.';
+  if (/vegetable cream|green beans|strawberries|kiwi/i.test(title)) return 'Gentler option with simple ingredients and easy tolerance adjustments.';
+  if (type === 'snack') return 'Simple snack adapted around availability, activity and restrictions.';
+  return 'Adjusted family meal with member-specific portions and ingredient swaps.';
+}
+
+function createMemberTimings(meal, payload) {
+  const profiles = payload.family?.profiles || [];
+  const dayNumber = Number(meal.id.match(/^day-(\d+)-/)?.[1]);
+  const events = [
+    ...payloadActivitiesForMeal(null, meal, { activities: payload.activities || [], dayNumber }),
+    ...eventsFromNote(payload.note || '', profiles, dayNumber)
+  ];
+  if (!profiles.length) return [];
+
+  const timings = profiles.map(profile => {
+    const event = events.find(item => item.profileId === profile.id);
+    if (!event) return { profileId: profile.id, name: profile.name, time: meal.time, note: 'Family default.' };
+    const mealMinutes = toMinutes(meal.time);
+    const eventMinutes = toMinutes(event.time);
+    const delta = eventMinutes - mealMinutes;
+    if (meal.type === 'breakfast' && delta >= 0 && delta <= 90) {
+      return { profileId: profile.id, name: profile.name, time: fromMinutes(Math.max(390, eventMinutes + 45)), note: `After ${event.type}; add a small pre-activity bite if needed.` };
+    }
+    if (meal.type === 'dinner' && delta >= -60 && delta <= 90) {
+      return { profileId: profile.id, name: profile.name, time: delta < 45 ? fromMinutes(eventMinutes + 75) : fromMinutes(mealMinutes - 30), note: `Adjusted around ${event.type}.` };
+    }
+    if (Math.abs(delta) <= 75) {
+      return { profileId: profile.id, name: profile.name, time: fromMinutes(delta > 0 ? mealMinutes - 45 : eventMinutes + 45), note: `Moved away from ${event.type}.` };
+    }
+    return { profileId: profile.id, name: profile.name, time: meal.time, note: 'Family default.' };
+  });
+
+  return timings.some(item => item.time !== meal.time || item.note !== 'Family default.') ? timings : [];
+}
+
+function payloadActivitiesForMeal(plan, meal, { activities = [], dayNumber } = {}) {
+  const mealDay = dayNumber || Number(meal.id.match(/^day-(\d+)-/)?.[1]);
+  return activities.filter(activity => Number(activity.dayNumber) === mealDay);
+}
+
+function eventsFromNote(note, profiles, dayNumber) {
+  const text = note.toLowerCase();
+  if (!/gym|basketball|padel|training|game|run|exercise/.test(text)) return [];
+  const time = parseTime(text);
+  if (!time) return [];
+  const activityType = text.match(/gym|basketball|padel|training|game|run|exercise/)?.[0] || 'Activity';
+  const profile = profiles.find(item => item.name && text.includes(item.name.toLowerCase())) || profiles[0];
+  return profile ? [{ dayNumber, profileId: profile.id, profileName: profile.name, type: activityType, time }] : [];
+}
+
+function parseTime(text) {
+  const colon = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (colon) return `${colon[1].padStart(2, '0')}:${colon[2]}`;
+  const h = text.match(/\b([01]?\d|2[0-3])\s*h\b/);
+  if (h) return `${h[1].padStart(2, '0')}:00`;
+  const ampm = text.match(/\b(1[0-2]|0?\d)\s*(a\.?m\.?|p\.?m\.?)\b/);
+  if (ampm) {
+    let hours = Number(ampm[1]);
+    if (ampm[2].startsWith('p') && hours < 12) hours += 12;
+    if (ampm[2].startsWith('a') && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:00`;
+  }
+  const plain = text.match(/\bat\s+([01]?\d|2[0-3])\b/);
+  return plain ? `${plain[1].padStart(2, '0')}:00` : '';
+}
+
+function toMinutes(time) {
+  const [hours, minutes] = String(time || '00:00').split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function fromMinutes(value) {
+  const safe = Math.max(360, Math.min(1410, value));
+  const hours = String(Math.floor(safe / 60)).padStart(2, '0');
+  const minutes = String(safe % 60).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function sameMeal(a, b) {
+  return String(a || '').toLowerCase().replace(/\s+variation\b/g, '').trim() === String(b || '').toLowerCase().replace(/\s+variation\b/g, '').trim();
+}
+
+function differentMeal(avoid, preferred, candidates) {
+  if (preferred && !avoid.some(title => sameMeal(preferred, title))) return preferred;
+  return candidates.find(candidate => !avoid.some(title => sameMeal(candidate, title))) || candidates.find(candidate => !sameMeal(candidate, avoid[0])) || preferred;
+}
+
+function uniqueTitles(titles) {
+  return [...new Set(titles.filter(Boolean))].slice(-8);
+}

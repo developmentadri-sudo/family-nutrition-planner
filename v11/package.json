@@ -1,0 +1,18 @@
+{
+  "name": "family-nutrition-planner-v11",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev:client": "vite client --host 127.0.0.1 --port 5173",
+    "dev:server": "node server/index.js",
+    "build": "vite build client",
+    "check:server": "node --check server/index.js && node --check server/storage.js && node --check server/ai.js && node --check server/schema.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  }
+}
