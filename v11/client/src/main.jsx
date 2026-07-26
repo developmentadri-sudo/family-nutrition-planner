@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api } from './services/api.js';
 import './styles.css';
@@ -11,6 +11,8 @@ function Icon({ name }) {
   const paths = {
     chevronLeft: <path d="m15 18-6-6 6-6" />,
     chevronRight: <path d="m9 18 6-6-6-6" />,
+    chevronDown: <path d="m6 9 6 6 6-6" />,
+    more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
     swap: <><path d="m16 3 4 4-4 4" /><path d="M20 7H4" /><path d="m8 21-4-4 4-4" /><path d="M4 17h16" /></>,
     ai: <><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z" /><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z" /></>,
     user: <><path d="M20 21a8 8 0 0 0-16 0" /><circle cx="12" cy="7" r="4" /></>,
@@ -208,7 +210,7 @@ function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal
   return (
     <section className="today">
       <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} />
-      <div className="toolbar"><div><h2>{day.label}</h2><p>Meals and events share one daily timeline.</p></div><div className="toolbarActions"><button onClick={() => setEventOpen(true)}><Icon name="plus" /> Add event</button><button onClick={() => onAdaptDay(selectedDay)}><Icon name="ai" /> Adapt day</button></div></div>
+      <div className="toolbar"><div><h2>{day.label}</h2></div><div className="toolbarActions"><button onClick={() => setEventOpen(true)}><Icon name="plus" /> Add event</button><button onClick={() => onAdaptDay(selectedDay)}><Icon name="ai" /> Adapt day</button></div></div>
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
         : <MealCard key={item.id} meal={item} open={!!open[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberMeal(item)} onSymptom={() => setSymptomMeal(item)} />)}</div>
@@ -239,26 +241,70 @@ function WeekSelector({ week, selectedDay, onSelectDay, onShift }) {
 
 function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
   const split = Array.isArray(meal.memberTimings) && meal.memberTimings.length > 0;
+  const [detailsOpen, setDetailsOpen] = useState(open);
+  const [adaptOpen, setAdaptOpen] = useState(open);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    setDetailsOpen(open);
+    if (!open) setAdaptOpen(false);
+  }, [open]);
+
+  useEffect(() => {
+    function closeMenu(event) {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
+    }
+    if (menuOpen) document.addEventListener('mousedown', closeMenu);
+    return () => document.removeEventListener('mousedown', closeMenu);
+  }, [menuOpen]);
+
+  async function handleAdapt() {
+    await onAdapt();
+    setDetailsOpen(false);
+    setAdaptOpen(false);
+  }
+
+  function choose(action) {
+    setMenuOpen(false);
+    action();
+  }
+
   return (
     <div className="agendaRow">
       <div className="time">{meal.time}</div>
       <article className="meal">
-        <div className="mealActions">
-          <button title="Swap meal" onClick={onSwap}><Icon name="swap" /></button>
-          <button title="Adapt plan" onClick={onToggle}><Icon name="ai" /></button>
-          <button title="Member specifics" onClick={onMembers}><Icon name="user" /></button>
-          <button title="Log symptom" onClick={onSymptom}><Icon name="symptom" /></button>
+        <div className="mealMenu" ref={menuRef}>
+          <button className="iconButton" title="Meal actions" onClick={() => setMenuOpen(!menuOpen)}><Icon name="more" /></button>
+          {menuOpen && <div className="actionMenu">
+            <button onClick={() => choose(onSwap)}><Icon name="swap" /> Swap meal</button>
+            <button onClick={() => choose(() => { setDetailsOpen(true); setAdaptOpen(true); onToggle(); })}><Icon name="ai" /> Suggest variation</button>
+            <button onClick={() => choose(onMembers)}><Icon name="user" /> User-specific adjustments</button>
+            <button onClick={() => choose(onSymptom)}><Icon name="symptom" /> Log symptoms</button>
+          </div>}
         </div>
-        <p className="kicker">{mealLabels[meal.type]}</p>
+        <div className="mealHeader"><p className="kicker">{mealLabels[meal.type]}</p>{meal.reason && <span className="editedPill">Edited</span>}</div>
         <h2>{meal.title} <MealEmoji meal={meal} /></h2>
         <p>{meal.description}</p>
         <div className="tagRow">{(meal.tags || inferTags(meal.title)).map(tag => <span className={`pill ${tag.tone}`} key={tag.label}>{tag.label}</span>)}</div>
-        {split && <div className="timingBox"><div className="timingHeader">Timing by person <span className="pill orange">Split timing</span></div><div className="timingGrid">{meal.memberTimings.map(item => <div className="timingNote" key={item.profileId || item.name}><b>{item.name} · {item.time}</b><span>{item.note}</span></div>)}</div></div>}
-        {meal.reason && <div className="reason"><b>Why changed:</b> {meal.reason}</div>}
-        {open && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." /><button className="primary" onClick={onAdapt}>Adapt this meal</button></div>}
+        {split && <div className="timingChips">{meal.memberTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
+        {detailsOpen && <div className="detailsPanel">
+          {meal.reason && <div className="changedNote"><Icon name="edit" /> Changed: {cleanReason(meal.reason)}</div>}
+          {!adaptOpen && <button className="adaptPrompt" onClick={() => { setAdaptOpen(true); onToggle(); }}><Icon name="edit" /> Adapt this meal...</button>}
+          {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." /><button className="primary" onClick={handleAdapt}>Adapt this meal</button></div>}
+        </div>}
+        <button className="detailsToggle" onClick={() => setDetailsOpen(!detailsOpen)}>Details and adapt <Icon name="chevronDown" /></button>
       </article>
     </div>
   );
+}
+
+function TimingChip({ item }) {
+  return <div className="timingChip"><span className="chipAvatar">{item.name?.slice(0, 1).toUpperCase() || 'P'}</span><div><b>{item.name} · <em>{item.time}</em></b><span>{item.note}</span></div></div>;
+}
+
+function cleanReason(reason) {
+  return String(reason || '').replace(/^Changed this \w+ because:\s*/i, '');
 }
 
 function ActivityCard({ activity, onEdit, onDelete }) {
