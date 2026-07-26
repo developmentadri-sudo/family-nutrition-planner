@@ -90,6 +90,7 @@ async function callOpenAI(prompt) {
 function buildPlanPrompt({ family, note }) {
   return `Create a complete 28-day shared family nutrition plan. Include all 28 days and all four meal types per day.
 Return JSON with: {"summary":"...","days":[{"dayNumber":1,"label":"MON 06/07","meals":[{"type":"breakfast","time":"08:00","title":"...","description":"...","reason":"...","tags":[{"label":"Protein","tone":"blue"}],"icon":"bowl","memberNotes":[{"profileId":"...","name":"...","note":"..."}]}]}]}.
+Respect vegetarian, vegan, pescetarian, allergy and intolerance restrictions across the whole family. If any shared family profile is vegetarian or vegan, do not include chicken, turkey, meat, fish or seafood. If pescetarian, do not include chicken, turkey or meat.
 Profiles: ${JSON.stringify(family?.profiles || [])}
 Request: ${note || 'Create the first balanced routine.'}`;
 }
@@ -101,13 +102,14 @@ Current meal: ${JSON.stringify(meal)}
 Current day context: ${JSON.stringify(plan.days.find(day => day.meals.some(item => item.id === meal.id)))}
 Profiles: ${JSON.stringify(family?.profiles || [])}
 Scheduled events: ${JSON.stringify(payloadActivitiesForMeal(plan, meal, { activities: payload.activities || [] }))}
+Respect vegetarian, vegan, pescetarian, allergy and intolerance restrictions. If the family is vegetarian or vegan, do not return chicken, turkey, meat, fish or seafood. If pescetarian, do not return chicken, turkey or meat.
 User request: ${note || 'Adapt this meal while preserving the family routine.'}`;
 }
 
 function createLocalMealUpdate(meal, payload) {
   const note = payload.note || 'make this meal easier for today';
   const profiles = payload.family?.profiles || [];
-  const title = chooseLocalTitle(meal, note);
+  const title = chooseLocalTitle(meal, note, payload.family);
   return {
     title,
     description: describeLocalAdaptation(title, meal.type),
@@ -120,9 +122,10 @@ function createLocalMealUpdate(meal, payload) {
   };
 }
 
-function chooseLocalTitle(meal, note) {
+function chooseLocalTitle(meal, note, family) {
   const text = note.toLowerCase();
-  const alternatives = {
+  const mode = householdDietMode(family?.profiles || []);
+  const alternatives = mode === 'vegetarian' || mode === 'vegan' ? vegetarianAlternatives() : {
     breakfast: {
       noDairy: 'Egg and Avocado Toast',
       noGluten: 'Lactose-free Yogurt with Kiwi',
@@ -152,8 +155,14 @@ function chooseLocalTitle(meal, note) {
       default: 'Zucchini Omelette'
     }
   };
+  if (mode === 'pescetarian') {
+    alternatives.lunch.noFish = 'Chickpea Quinoa Bowl';
+    alternatives.lunch.default = 'Prawn Quinoa Bowl';
+    alternatives.dinner.noFish = 'Spanish Potato Omelette';
+    alternatives.dinner.default = 'Zucchini Omelette';
+  }
   const set = alternatives[meal.type] || alternatives.lunch;
-  const candidates = uniqueTitles(Object.values(set));
+  const candidates = uniqueTitles(Object.values(set)).filter(title => allowedForDiet(title, mode));
   const avoid = [meal.title, meal.swappedFromTitle, ...(meal.previousTitles || [])];
   if (/no dairy|avoid dairy|lactose|milk|cheese|yogurt/.test(text)) return differentMeal(avoid, set.noDairy, candidates);
   if (/no gluten|gluten|celiac|bread|pasta/.test(text)) return differentMeal(avoid, set.noGluten, candidates);
@@ -161,15 +170,64 @@ function chooseLocalTitle(meal, note) {
   if (/no nut|nut|walnut|almond/.test(text)) return differentMeal(avoid, set.noNuts, candidates);
   if (/active|training|basketball|padel|gym|run|game|carb|performance/.test(text)) return differentMeal(avoid, set.active, candidates);
   if (/light|reflux|gut|bloat|tired|late|small/.test(text)) return differentMeal(avoid, set.light, candidates);
-  return candidates.find(candidate => !avoid.some(title => sameMeal(candidate, title))) || candidates.find(candidate => !sameMeal(candidate, meal.title)) || set.default;
+  return candidates.find(candidate => !avoid.some(title => sameMeal(candidate, title))) || candidates.find(candidate => !sameMeal(candidate, meal.title)) || candidates[0] || set.default;
 }
 
 function describeLocalAdaptation(title, type) {
+  if (/lentil|chickpea|bean|tofu|hummus/i.test(title)) return 'Vegetarian family meal with protein, carbs and gentle add-ons scaled by profile.';
   if (/chicken|salmon|hake|cod|prawn|tuna|bonito/i.test(title)) return 'Shared protein-focused meal with portions and sides adjusted per profile.';
   if (/oat|rice|potato|banana|toast|pasta/i.test(title)) return 'Higher-energy option for activity, with carb portions scaled by person.';
   if (/vegetable cream|green beans|strawberries|kiwi/i.test(title)) return 'Gentler option with simple ingredients and easy tolerance adjustments.';
   if (type === 'snack') return 'Simple snack adapted around availability, activity and restrictions.';
   return 'Adjusted family meal with member-specific portions and ingredient swaps.';
+}
+
+function vegetarianAlternatives() {
+  return {
+    breakfast: {
+      noDairy: 'Egg and Avocado Toast',
+      noGluten: 'Lactose-free Yogurt with Kiwi',
+      active: 'Oat Porridge with Banana',
+      light: 'Yogurt with Strawberries',
+      default: 'Vegetable Omelette'
+    },
+    lunch: {
+      noFish: 'Chickpea Quinoa Bowl',
+      noGluten: 'Lentil Rice Bowl',
+      active: 'Bean Sweet Potato Plate',
+      light: 'Vegetable Quinoa Bowl',
+      default: 'Lentil Rice Bowl'
+    },
+    snack: {
+      noNuts: 'Kiwi and Cured Cheese',
+      noDairy: 'Fruit and Pumpkin Seeds',
+      active: 'Banana and Rice Cakes',
+      light: 'Strawberries',
+      default: 'Kiwi and Walnuts'
+    },
+    dinner: {
+      noFish: 'Spanish Potato Omelette',
+      noGluten: 'Chickpeas with Green Beans',
+      active: 'Rice Omelette with Spinach',
+      light: 'Vegetable Cream with Tofu',
+      default: 'Zucchini Omelette'
+    }
+  };
+}
+
+function householdDietMode(profiles) {
+  const text = profiles.map(profile => `${profile.goal || ''} ${profile.restrictions || ''} ${profile.preferences || ''}`).join(' ').toLowerCase();
+  if (/vegan/.test(text)) return 'vegan';
+  if (/vegetarian/.test(text)) return 'vegetarian';
+  if (/pescetarian/.test(text)) return 'pescetarian';
+  return 'omnivore';
+}
+
+function allowedForDiet(title, mode) {
+  const text = title.toLowerCase();
+  if (mode === 'vegetarian' || mode === 'vegan') return !/chicken|turkey|meat|salmon|hake|cod|prawn|bonito|tuna|fish|seafood/.test(text);
+  if (mode === 'pescetarian') return !/chicken|turkey|meat/.test(text);
+  return true;
 }
 
 function createMemberTimings(meal, payload) {

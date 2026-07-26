@@ -95,13 +95,6 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .tagRow { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
 .tagRow .pill { padding: 3px 8px; font-size: 11px; background: transparent; color: var(--text-secondary); border-color: var(--line); }
 .adaptBox { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-.detailsPanel { margin-top: 12px; padding-top: 12px; border-top: .5px solid var(--line); display: grid; gap: 10px; }
-.changedNote { display: inline-flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; border-radius: 10px; background: var(--warning-bg); color: var(--warning-text); padding: 7px 9px; font-size: 12px; line-height: 1.35; }
-.changedNote .icon { width: 14px; height: 14px; flex: 0 0 auto; }
-.adaptPrompt { width: 100%; justify-content: center; border: .5px dashed var(--line-strong); background: transparent; border-radius: 12px; color: var(--muted); }
-.detailsToggle { width: 100%; margin-top: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-top: .5px solid var(--line); border-radius: 0; background: transparent; color: var(--muted); padding: 11px 0 0; font-size: 12px; font-weight: 560; }
-.detailsToggle:hover, .detailsToggle:focus-visible { box-shadow: none; color: var(--ink); }
-.detailsToggle .icon { width: 14px; height: 14px; }
 .timingChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .timingChip { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 8px; max-width: 280px; min-width: 190px; border: .5px solid var(--line); border-radius: 999px; background: var(--surface-1); padding: 6px 10px 6px 6px; }
 .chipAvatar { width: 26px; height: 26px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: rgba(85, 214, 176, .14); color: var(--accent); font-size: 12px; font-weight: 760; }

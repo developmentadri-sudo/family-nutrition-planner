@@ -11,7 +11,6 @@ function Icon({ name }) {
   const paths = {
     chevronLeft: <path d="m15 18-6-6 6-6" />,
     chevronRight: <path d="m9 18 6-6-6-6" />,
-    chevronDown: <path d="m6 9 6 6 6-6" />,
     more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
     swap: <><path d="m16 3 4 4-4 4" /><path d="M20 7H4" /><path d="m8 21-4-4 4-4" /><path d="M4 17h16" /></>,
     ai: <><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z" /><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z" /></>,
@@ -241,14 +240,12 @@ function WeekSelector({ week, selectedDay, onSelectDay, onShift }) {
 
 function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
   const split = Array.isArray(meal.memberTimings) && meal.memberTimings.length > 0;
-  const [detailsOpen, setDetailsOpen] = useState(open);
   const [adaptOpen, setAdaptOpen] = useState(open);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
-    setDetailsOpen(open);
-    if (!open) setAdaptOpen(false);
+    setAdaptOpen(open);
   }, [open]);
 
   useEffect(() => {
@@ -261,7 +258,6 @@ function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembe
 
   async function handleAdapt() {
     await onAdapt();
-    setDetailsOpen(false);
     setAdaptOpen(false);
   }
 
@@ -278,7 +274,7 @@ function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembe
           <button className="iconButton" title="Meal actions" onClick={() => setMenuOpen(!menuOpen)}><Icon name="more" /></button>
           {menuOpen && <div className="actionMenu">
             <button onClick={() => choose(onSwap)}><Icon name="swap" /> Swap meal</button>
-            <button onClick={() => choose(() => { setDetailsOpen(true); setAdaptOpen(true); onToggle(); })}><Icon name="ai" /> Suggest variation</button>
+            <button onClick={() => choose(() => { setAdaptOpen(true); onToggle(); })}><Icon name="ai" /> Suggest variation</button>
             <button onClick={() => choose(onMembers)}><Icon name="user" /> User-specific adjustments</button>
             <button onClick={() => choose(onSymptom)}><Icon name="symptom" /> Log symptoms</button>
           </div>}
@@ -288,12 +284,7 @@ function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembe
         <p>{meal.description}</p>
         <div className="tagRow">{(meal.tags || inferTags(meal.title)).map(tag => <span className={`pill ${tag.tone}`} key={tag.label}>{tag.label}</span>)}</div>
         {split && <div className="timingChips">{meal.memberTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
-        {detailsOpen && <div className="detailsPanel">
-          {meal.reason && <div className="changedNote"><Icon name="edit" /> Changed: {cleanReason(meal.reason)}</div>}
-          {!adaptOpen && <button className="adaptPrompt" onClick={() => { setAdaptOpen(true); onToggle(); }}><Icon name="edit" /> Adapt this meal...</button>}
-          {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." /><button className="primary" onClick={handleAdapt}>Adapt this meal</button></div>}
-        </div>}
-        <button className="detailsToggle" onClick={() => setDetailsOpen(!detailsOpen)}>Details and adapt <Icon name="chevronDown" /></button>
+        {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." /><button className="primary" onClick={handleAdapt}>Adapt this meal</button></div>}
       </article>
     </div>
   );
@@ -301,10 +292,6 @@ function MealCard({ meal, open, note, onToggle, onNote, onAdapt, onSwap, onMembe
 
 function TimingChip({ item }) {
   return <div className="timingChip"><span className="chipAvatar">{item.name?.slice(0, 1).toUpperCase() || 'P'}</span><div><b>{item.name} · <em>{item.time}</em></b><span>{item.note}</span></div></div>;
-}
-
-function cleanReason(reason) {
-  return String(reason || '').replace(/^Changed this \w+ because:\s*/i, '');
 }
 
 function ActivityCard({ activity, onEdit, onDelete }) {

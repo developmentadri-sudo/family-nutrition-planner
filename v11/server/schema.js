@@ -7,6 +7,12 @@ const baseMeals = {
   snack: ['Kiwi and Walnuts', 'Strawberries', 'Walnuts and Blueberries', 'Cured Cheese and Grapes', 'Almonds and Orange', 'Kiwi', 'Banana Rice Cakes', 'Blueberries and Yogurt', 'Apple and Seed Butter', 'Grapes and Cheese', 'Orange and Walnuts', 'Pear and Kefir', 'Rice Cakes with Turkey', 'Strawberries and Seeds', 'Banana and Yogurt', 'Kiwi and Pumpkin Seeds', 'Blueberries and Almonds', 'Apple and Cured Cheese', 'Orange Rice Cakes', 'Pear and Walnuts', 'Grapes and Yogurt', 'Banana and Seeds', 'Kiwi and Cheese', 'Strawberries and Kefir', 'Blueberry Rice Cakes', 'Apple and Yogurt', 'Orange and Pumpkin Seeds', 'Pear and Cheese'],
   dinner: ['Spanish Potato Omelette', 'Vegetable Cream with Egg', 'Cod with Green Beans', 'Spinach Omelette', 'Pumpkin Vegetable Cream', 'Zucchini Omelette', 'Hake with Potatoes', 'Chicken Vegetable Soup', 'Rice Omelette with Spinach', 'Turkey and Pumpkin Plate', 'Cod Potato Omelette', 'Vegetable Cream with Hake', 'Salmon with Green Beans', 'Egg and Sweet Potato Plate', 'Chicken Rice Soup', 'Zucchini Cream with Egg', 'Hake Pumpkin Plate', 'Spinach Tortilla with Salad', 'Turkey Potato Omelette', 'Cod Vegetable Soup', 'Rice Bowl with Egg', 'Chicken Green Beans', 'Pumpkin Cream with Cod', 'Spanish Omelette with Spinach', 'Hake Rice Plate', 'Vegetable Soup with Turkey', 'Salmon Potato Plate', 'Egg and Zucchini Plate']
 };
+const vegetarianMeals = {
+  breakfast: ['Lactose-free Greek Yogurt Bowl', 'Egg and Avocado Toast', 'Yogurt with Kiwi', 'Small Oat Porridge', 'Sourdough Toast with Cured Cheese', 'Spinach Omelette Toast', 'Yogurt with Strawberries', 'Banana Oat Bowl', 'Egg Toast with Tomato', 'Greek Yogurt with Walnuts', 'Kiwi Protein Bowl', 'Avocado Rice Cakes', 'Berry Yogurt Bowl', 'Soft Scrambled Eggs', 'Apple Cinnamon Porridge', 'Cottage Cheese Toast', 'Blueberry Kefir Bowl', 'Hummus Toast', 'Peanut-free Seed Porridge', 'Lentil Spread Toast', 'Strawberry Oat Bowl', 'Egg and Potato Tortilla Bite', 'Pear Yogurt Bowl', 'Hummus Toast', 'Rice Porridge with Banana', 'Cheese and Grape Toast', 'Protein Fruit Bowl', 'Vegetable Omelette'],
+  lunch: ['Lentil Rice Bowl', 'Chickpea Quinoa Bowl', 'Egg and Rice Bowl', 'Tofu Rice Bowl', 'Bean Sweet Potato Plate', 'Vegetable Quinoa Bowl', 'Gluten-free Lentil Pasta', 'Chickpea Rice Plate', 'Egg Potato Salad', 'Lentil Potato Bowl', 'Tofu Quinoa Plate', 'Vegetable Couscous Bowl', 'Chickpea Sweet Potato Plate', 'Egg and Rice Bowl', 'Bean Potato Salad', 'Lentil Pasta Bowl', 'Tofu Quinoa Plate', 'Vegetable Rice Noodles', 'Chickpea Rice Bowl', 'Vegetable Pumpkin Plate', 'Bean Potato Bowl', 'Chickpea Rice Plate', 'Lentil Couscous Bowl', 'Vegetable Pasta Bowl', 'Lentil Sweet Potato Plate', 'Tofu Rice Noodles', 'Bean Sweet Potato Bowl', 'Egg Potato Salad'],
+  snack: ['Kiwi and Walnuts', 'Strawberries', 'Walnuts and Blueberries', 'Cured Cheese and Grapes', 'Almonds and Orange', 'Kiwi', 'Banana Rice Cakes', 'Blueberries and Yogurt', 'Apple and Seed Butter', 'Grapes and Cheese', 'Orange and Walnuts', 'Pear and Kefir', 'Rice Cakes with Hummus', 'Strawberries and Seeds', 'Banana and Yogurt', 'Kiwi and Pumpkin Seeds', 'Blueberries and Almonds', 'Apple and Cured Cheese', 'Orange Rice Cakes', 'Pear and Walnuts', 'Grapes and Yogurt', 'Banana and Seeds', 'Kiwi and Cheese', 'Strawberries and Kefir', 'Blueberry Rice Cakes', 'Apple and Yogurt', 'Orange and Pumpkin Seeds', 'Pear and Cheese'],
+  dinner: ['Spanish Potato Omelette', 'Vegetable Cream with Egg', 'Lentil Soup with Green Beans', 'Spinach Omelette', 'Pumpkin Vegetable Cream', 'Zucchini Omelette', 'Chickpea Potatoes', 'Vegetable Soup with Egg', 'Rice Omelette with Spinach', 'Bean and Pumpkin Plate', 'Lentil Potato Omelette', 'Vegetable Cream with Tofu', 'Chickpeas with Green Beans', 'Egg and Sweet Potato Plate', 'Vegetable Rice Soup', 'Zucchini Cream with Egg', 'Lentil Pumpkin Plate', 'Spinach Tortilla with Salad', 'Bean Potato Omelette', 'Chickpea Vegetable Soup', 'Rice Bowl with Egg', 'Tofu Green Beans', 'Pumpkin Cream with Lentils', 'Spanish Omelette with Spinach', 'Vegetable Rice Plate', 'Vegetable Soup with Beans', 'Lentil Potato Plate', 'Egg and Zucchini Plate']
+};
 
 export function createStarterPlan({ family, note = '', source = 'local' }) {
   const now = new Date().toISOString();
@@ -18,7 +24,7 @@ export function createStarterPlan({ family, note = '', source = 'local' }) {
       dayNumber,
       label,
       meals: mealTypes.map(type => {
-        const title = baseMeals[type][index];
+        const title = mealForFamily(type, index, family);
         return {
           id: `day-${dayNumber}-${type}`,
           type,
@@ -106,6 +112,30 @@ export function validatePlan(plan) {
   return plan;
 }
 
+export function sanitizePlanForFamily(plan, family) {
+  if (!plan?.days) return plan;
+  const profiles = family?.profiles || [];
+  return {
+    ...plan,
+    days: plan.days.map(day => ({
+      ...day,
+      meals: day.meals.map(meal => {
+        if (allowedForFamily(meal.title, profiles)) return meal;
+        const title = mealForFamily(meal.type, day.dayNumber - 1, family);
+        return {
+          ...meal,
+          title,
+          description: describeMeal(title, meal.type),
+          reason: 'Adjusted for household diet restrictions.',
+          tags: inferTags(title),
+          icon: mealIcon(title, meal.type),
+          memberNotes: createMemberNotes(profiles, { title, type: meal.type })
+        };
+      })
+    }))
+  };
+}
+
 export function createMemberNotes(profiles, meal) {
   return profiles.map(profile => ({
     profileId: profile.id,
@@ -122,7 +152,7 @@ function profileMealNote(profile, meal) {
   if (/lactose|dairy/.test(context) && /yogurt|cheese|milk/.test(title)) notes.push('Use lactose-free dairy or swap to eggs/soy yogurt.');
   if (/gluten|celiac/.test(context) && /toast|bread|pasta|sourdough/.test(title)) notes.push('Use gluten-free bread or pasta.');
   if (/nut|walnut|almond/.test(context) && /walnut|almond|nuts/.test(title)) notes.push('Replace nuts with seeds or fruit.');
-  if (/fish|seafood/.test(context) && /salmon|hake|cod|prawn|bonito|tuna/.test(title)) notes.push('Replace fish with egg, chicken or legumes.');
+  if (/fish|seafood/.test(context) && /salmon|hake|cod|prawn|bonito|tuna/.test(title)) notes.push('Replace fish with eggs, tofu or legumes.');
   if (/egg/.test(context) && /egg|omelette/.test(title)) notes.push('Use tofu scramble or a fish/chicken portion instead.');
   if (/gut|reflux|gallbladder|bloat/.test(context)) notes.push('Keep fat moderate, seasoning gentle and portions slightly smaller.');
   if (/performance|basketball|padel|gym|active|training|run/.test(context)) notes.push(/rice|potato|pasta|toast|oat/.test(title) ? 'Keep the carb base and scale portion around training.' : 'Add an easy carb side if this is near training.');
@@ -133,11 +163,37 @@ function profileMealNote(profile, meal) {
 }
 
 function describeMeal(title, type) {
+  if (/lentil|chickpea|bean|tofu/i.test(title)) return 'Vegetarian family base with protein, carbs and gentle add-ons by profile.';
   if (/salmon|hake|cod|prawn|bonito/i.test(title)) return 'Shared Mediterranean fish base with adjustable carbohydrates and vegetables.';
   if (/yogurt/i.test(title)) return 'Simple high-protein breakfast with fruit and tolerance-friendly add-ons.';
   if (/egg|omelette/i.test(title)) return 'Flexible egg-based meal that can be adapted by portion and side dish.';
   if (type === 'snack') return 'Portable family snack with easy individual swaps.';
   return 'Shared family meal with per-member portions and add-ons.';
+}
+
+function mealForFamily(type, index, family) {
+  const mode = householdDietMode(family?.profiles || []);
+  const pool = mode === 'vegetarian' || mode === 'vegan' ? vegetarianMeals[type] : baseMeals[type];
+  let title = pool[index % pool.length];
+  if (mode !== 'omnivore' && /chicken|turkey/i.test(title)) title = vegetarianMeals[type][index % vegetarianMeals[type].length];
+  if ((mode === 'vegetarian' || mode === 'vegan') && /salmon|hake|cod|prawn|bonito|tuna|fish|seafood/i.test(title)) title = vegetarianMeals[type][index % vegetarianMeals[type].length];
+  return title;
+}
+
+function householdDietMode(profiles) {
+  const text = profiles.map(profile => `${profile.goal || ''} ${profile.restrictions || ''} ${profile.preferences || ''}`).join(' ').toLowerCase();
+  if (/vegan/.test(text)) return 'vegan';
+  if (/vegetarian/.test(text)) return 'vegetarian';
+  if (/pescetarian/.test(text)) return 'pescetarian';
+  return 'omnivore';
+}
+
+function allowedForFamily(title, profiles) {
+  const mode = householdDietMode(profiles);
+  const text = String(title || '').toLowerCase();
+  if (mode === 'vegetarian' || mode === 'vegan') return !/chicken|turkey|meat|salmon|hake|cod|prawn|bonito|tuna|fish|seafood/.test(text);
+  if (mode === 'pescetarian') return !/chicken|turkey|meat/.test(text);
+  return true;
 }
 
 export function normalizeAiPlan(aiPlan, fallbackPlan) {

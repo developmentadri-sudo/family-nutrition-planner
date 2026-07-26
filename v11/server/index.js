@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { adaptDayWithAi, adaptMealWithAi, generatePlanWithAi } from './ai.js';
-import { swapMeals } from './schema.js';
+import { sanitizePlanForFamily, swapMeals } from './schema.js';
 import { readStore, updateStore } from './storage.js';
 
 const port = Number(process.env.PORT || 8787);
@@ -24,13 +24,19 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'PUT' && route === '/family') {
-      const store = await updateStore(current => ({ ...current, family: normalizeFamily(body) }));
+      const family = normalizeFamily(body);
+      const store = await updateStore(current => ({
+        ...current,
+        family,
+        plans: current.plans.map(plan => plan.status === 'active' ? sanitizePlanForFamily(plan, family) : plan)
+      }));
       return send(res, 200, store.family);
     }
 
     if (req.method === 'GET' && route === '/plans/current') {
       const store = await readStore();
-      return send(res, 200, { plan: store.plans.find(plan => plan.status === 'active') || null });
+      const plan = store.plans.find(item => item.status === 'active') || null;
+      return send(res, 200, { plan: plan ? sanitizePlanForFamily(plan, store.family) : null });
     }
 
     if (req.method === 'POST' && route === '/plans/generate') {
