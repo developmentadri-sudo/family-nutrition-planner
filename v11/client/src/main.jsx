@@ -99,15 +99,24 @@ function App() {
   }
 
   async function updateActivity(activityId, payload) {
-    const result = await api.updateActivity(activityId, payload);
-    setActivities(result.activities || []);
-    setStatus('Activity updated. Use Adapt day when you want meals to react.');
+    try {
+      const result = await api.updateActivity(activityId, payload);
+      setActivities(result.activities || []);
+      setStatus('Activity updated. Use Adapt day when you want meals to react.');
+    } catch (error) {
+      setStatus(error.message);
+    }
   }
 
   async function deleteActivity(activityId) {
-    const result = await api.deleteActivity(activityId);
-    setActivities(result.activities || []);
-    setStatus('Activity removed. Use Adapt day if the meal timing should change back.');
+    try {
+      if (!activityId) throw new Error('Activity id missing.');
+      const result = await api.deleteActivity(activityId);
+      setActivities(result.activities || []);
+      setStatus('Activity removed. Use Adapt day if the meal timing should change back.');
+    } catch (error) {
+      setStatus(error.message);
+    }
   }
 
   if (!family) return <main className="shell"><section className="card">{status}</section></main>;
@@ -301,10 +310,14 @@ function ActivityCard({ activity, onEdit, onDelete }) {
       <article className="activityCard">
         <p className="kicker">Activity</p>
         <h2>{activity.type}</h2>
-        <div className="timingBox activityTiming"><div className="timingHeader">Timing by person</div><div className="timingGrid">{activity.people.map(person => <div className="timingNote eventNote" key={person.id}><div><b>{person.profileName || 'Family'} · {activity.time}</b><span>Manual event</span></div><div className="eventActions"><button title="Edit event" onClick={() => onEdit(person)}><Icon name="edit" /></button><button title="Remove event" onClick={() => onDelete(person.id)}><Icon name="trash" /></button></div></div>)}</div></div>
+        <div className="timingChips activityChips">{activity.people.map(person => <EventTimingChip activity={activity} person={person} key={person.id || `${person.profileId}-${activity.time}-${activity.type}`} onEdit={onEdit} onDelete={onDelete} />)}</div>
       </article>
     </div>
   );
+}
+
+function EventTimingChip({ activity, person, onEdit, onDelete }) {
+  return <div className="timingChip eventChip"><span className="chipAvatar">{person.profileName?.slice(0, 1).toUpperCase() || 'P'}</span><div><b>{person.profileName || 'Family'} · <em>{activity.time}</em></b><span>Manual event</span></div><div className="eventActions"><button title="Edit event" onClick={event => { event.stopPropagation(); onEdit(person); }}><Icon name="edit" /></button><button title="Remove event" onClick={event => { event.stopPropagation(); onDelete(person.id); }}><Icon name="trash" /></button></div></div>;
 }
 
 function SwapDrawer({ meal, plan, onChoose, onClose }) {

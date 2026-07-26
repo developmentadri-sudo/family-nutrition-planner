@@ -96,24 +96,19 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .tagRow .pill { padding: 3px 8px; font-size: 11px; background: transparent; color: var(--text-secondary); border-color: var(--line); }
 .adaptBox { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .timingChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.timingChip { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 8px; max-width: 280px; min-width: 190px; border: .5px solid var(--line); border-radius: 999px; background: var(--surface-1); padding: 6px 10px 6px 6px; }
-.chipAvatar { width: 26px; height: 26px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: rgba(85, 214, 176, .14); color: var(--accent); font-size: 12px; font-weight: 760; }
+.timingChip { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; max-width: 280px; min-width: 190px; border: .5px solid var(--line); border-radius: 999px; background: var(--surface-1); padding: 6px 10px 6px 6px; }
+.chipAvatar { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; background: rgba(85, 214, 176, .14); color: var(--accent); font-size: 12px; font-weight: 760; line-height: 1; text-align: center; }
 .timingChip:nth-child(2n) .chipAvatar { background: var(--pro-bg); color: var(--pro-text); }
 .timingChip b, .timingChip span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timingChip b { font-size: 12px; font-weight: 620; }
 .timingChip em { color: var(--accent); font-style: normal; }
 .timingChip span { color: var(--muted); font-size: 11px; margin-top: 1px; }
-.timingBox { margin-top: 14px; border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: #faf7ef; }
-.timingHeader { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; }
-.timingGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-top: 10px; }
-.timingNote { border: 1px solid var(--line); border-radius: 13px; background: var(--card-2); padding: 10px; }
-.timingNote b, .timingNote span { display: block; }
-.timingNote span { margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.35; }
-.activityTiming { margin-top: 16px; }
-.eventNote { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.activityChips { margin-top: 12px; }
+.eventChip { grid-template-columns: 28px minmax(0, 1fr) auto; max-width: 360px; }
 .eventActions { display: flex; gap: 6px; flex: 0 0 auto; }
-.eventActions button { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); background: var(--card); }
-.eventActions .icon { width: 15px; height: 15px; }
+.eventActions button { width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); background: transparent; border-color: transparent; }
+.eventActions button:hover, .eventActions button:focus-visible { background: var(--card); box-shadow: none; }
+.eventActions .icon { width: 14px; height: 14px; }
 .weekGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .weekCard { display: grid; gap: 8px; text-align: left; border-radius: 18px; padding: 14px; background: var(--card); }
 .weekCard.active { background: var(--card-2); border-color: var(--accent); color: var(--ink); }
