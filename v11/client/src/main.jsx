@@ -173,7 +173,7 @@ function Profiles({ family, plan, onChange, onGenerate }) {
 function ProfileCard({ profile, onChange }) {
   return (
     <div className="card profile">
-      <div className="avatar">{profile.name?.slice(0, 2).toUpperCase() || 'P'}</div>
+      <div className="avatar"><span className="avatarLetter">{profile.name?.slice(0, 2).toUpperCase() || 'P'}</span></div>
       <label>Name<input value={profile.name || ''} onChange={e => onChange({ name: e.target.value })} /></label>
       <label>Goal<input value={profile.goal || ''} onChange={e => onChange({ goal: e.target.value })} /></label>
       <label>Age<input value={profile.age || ''} onChange={e => onChange({ age: e.target.value })} /></label>
@@ -301,7 +301,7 @@ function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onA
 }
 
 function TimingChip({ item }) {
-  return <div className="timingChip"><span className="chipAvatar">{item.name?.slice(0, 1).toUpperCase() || 'P'}</span><div><b>{item.name} · <em>{item.time}</em></b><span>{item.note}</span></div></div>;
+  return <div className="timingChip"><span className="chipAvatar"><span className="avatarLetter">{item.name?.slice(0, 1).toUpperCase() || 'P'}</span></span><div><b>{item.name} · <em>{item.time}</em></b><span>{item.note}</span></div></div>;
 }
 
 function ActivityCard({ activity, onEdit, onDelete }) {
@@ -318,7 +318,7 @@ function ActivityCard({ activity, onEdit, onDelete }) {
 }
 
 function EventTimingChip({ activity, person, onEdit, onDelete }) {
-  return <div className="timingChip eventChip"><span className="chipAvatar">{person.profileName?.slice(0, 1).toUpperCase() || 'P'}</span><div><b>{person.profileName || 'Family'} · <em>{activity.time}</em></b><span>Manual event</span></div><div className="eventActions"><button title="Edit event" onClick={event => { event.stopPropagation(); onEdit(person); }}><Icon name="edit" /></button><button title="Remove event" onClick={event => { event.stopPropagation(); onDelete(person.id); }}><Icon name="trash" /></button></div></div>;
+  return <div className="timingChip eventChip"><span className="chipAvatar"><span className="avatarLetter">{person.profileName?.slice(0, 1).toUpperCase() || 'P'}</span></span><div><b>{person.profileName || 'Family'} · <em>{activity.time}</em></b><span>Manual event</span></div><div className="eventActions"><button title="Edit event" onClick={event => { event.stopPropagation(); onEdit(person); }}><Icon name="edit" /></button><button title="Remove event" onClick={event => { event.stopPropagation(); onDelete(person.id); }}><Icon name="trash" /></button></div></div>;
 }
 
 function UserSpecificsInline({ meal, family }) {
@@ -327,7 +327,7 @@ function UserSpecificsInline({ meal, family }) {
     <div className="inlineSpecifics">
       {notes.map(item => (
         <section className="specificChip" key={item.profileId}>
-          <span className="chipAvatar">{item.name?.slice(0, 1).toUpperCase() || 'P'}</span>
+          <span className="chipAvatar"><span className="avatarLetter">{item.name?.slice(0, 1).toUpperCase() || 'P'}</span></span>
           <div><b>{item.name}</b><span>{item.note}</span></div>
         </section>
       ))}
@@ -342,7 +342,7 @@ function SwapDrawer({ meal, plan, onChoose, onClose }) {
 
 function MemberDrawer({ meal, family, onClose }) {
   const notes = memberNotesForMeal(meal, family.profiles || []);
-  return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>User Specifics</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><div className="memberList">{notes.map(item => <section className="memberNote" key={item.profileId}><div className="avatar">{item.name?.slice(0, 2).toUpperCase() || 'P'}</div><div><h3>{item.name}</h3><p>{item.note}</p></div></section>)}</div></aside></div>;
+  return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>User Specifics</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><div className="memberList">{notes.map(item => <section className="memberNote" key={item.profileId}><div className="avatar"><span className="avatarLetter">{item.name?.slice(0, 2).toUpperCase() || 'P'}</span></div><div><h3>{item.name}</h3><p>{item.note}</p></div></section>)}</div></aside></div>;
 }
 
 function SymptomDialog({ meal, family, onSave, onClose }) {
