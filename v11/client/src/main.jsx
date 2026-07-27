@@ -5,6 +5,7 @@ import './styles.css';
 
 const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 const planStart = new Date(2026, 6, 6);
+const personaStorageKey = 'family-nutrition-planner-persona';
 
 function Icon({ name }) {
   const paths = {
@@ -30,8 +31,10 @@ function App() {
   const [plan, setPlan] = useState(null);
   const [activities, setActivities] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v12.1 workspace...');
+  const [status, setStatus] = useState('Loading v12.2 workspace...');
   const [toast, setToast] = useState('');
+  const [selectedPersona, setSelectedPersona] = useState(() => localStorage.getItem(personaStorageKey) || '');
+  const [personaOpen, setPersonaOpen] = useState(false);
 
   function notify(message) {
     setToast(message);
@@ -47,6 +50,19 @@ function App() {
   }
 
   useEffect(() => { refresh().catch(err => { setStatus(err.message); notify(err.message); }); }, []);
+
+  useEffect(() => {
+    if (!family) return;
+    const validIds = new Set(['family', ...(family.profiles || []).map(profile => profile.id)]);
+    if (!selectedPersona || !validIds.has(selectedPersona)) setPersonaOpen(true);
+  }, [family, selectedPersona]);
+
+  function choosePersona(personaId) {
+    localStorage.setItem(personaStorageKey, personaId);
+    setSelectedPersona(personaId);
+    setPersonaOpen(false);
+    notify(`Viewing as ${personaLabel(personaId, family)}.`);
+  }
 
   async function saveFamily(nextFamily) {
     setFamily(nextFamily);
@@ -136,6 +152,10 @@ function App() {
               <button className={activeTab === 'Week' ? 'active' : ''} onClick={() => setActiveTab('Week')}>Week</button>
               <button className={activeTab === 'Profiles' ? 'active' : ''} onClick={() => setActiveTab('Profiles')}>Profiles</button>
             </div>
+            <button className="personaButton" onClick={() => setPersonaOpen(true)}>
+              <span className="avatar mini"><span className="avatarLetter">{personaInitials(selectedPersona, family)}</span></span>
+              <span>{personaLabel(selectedPersona, family)}</span>
+            </button>
           </div>
         </div>
       </header>
@@ -145,7 +165,36 @@ function App() {
         {activeTab === 'Today' && <Today family={family} plan={plan} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
       </main>
       <Toast message={toast} onDone={() => setToast('')} />
+      {personaOpen && <PersonaSelector family={family} selectedPersona={selectedPersona} onChoose={choosePersona} />}
     </>
+  );
+}
+
+function PersonaSelector({ family, selectedPersona, onChoose }) {
+  const choices = [{ id: 'family', name: 'Family', description: 'Shared plan, everyone together.' }, ...(family.profiles || []).map(profile => ({
+    id: profile.id,
+    name: profile.name,
+    description: personaDescription(profile)
+  }))];
+
+  return (
+    <div className="personaScreen">
+      <section className="personaPanel">
+        <div>
+          <p className="kicker">Welcome</p>
+          <h2>Who is using the planner?</h2>
+          <p>Choose a lens for the app. The meal plan stays shared; the language and priorities will become personal in the next steps.</p>
+        </div>
+        <div className="personaGrid">
+          {choices.map(choice => (
+            <button className={selectedPersona === choice.id ? 'personaChoice active' : 'personaChoice'} key={choice.id} onClick={() => onChoose(choice.id)}>
+              <span className="avatar"><span className="avatarLetter">{choice.id === 'family' ? 'FA' : choice.name?.slice(0, 2).toUpperCase() || 'P'}</span></span>
+              <span><b>{choice.name}</b><small>{choice.description}</small></span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -516,6 +565,25 @@ function profileAlternativeTitle(title, type, diet) {
   if (/quinoa/.test(text)) return 'chickpea quinoa bowl';
   if (/pasta/.test(text)) return 'lentil pasta bowl';
   return diet === 'pescetarian' ? 'fish, eggs or legumes' : 'eggs, tofu or legumes';
+}
+
+function personaLabel(personaId, family) {
+  if (personaId === 'family') return 'Family';
+  return (family?.profiles || []).find(profile => profile.id === personaId)?.name || 'Choose user';
+}
+
+function personaInitials(personaId, family) {
+  if (personaId === 'family') return 'FA';
+  const profile = (family?.profiles || []).find(item => item.id === personaId);
+  return profile?.name?.slice(0, 2).toUpperCase() || 'ME';
+}
+
+function personaDescription(profile) {
+  const text = `${profile.goal || ''} ${profile.restrictions || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
+  if (/gut|reflux|bloat|lactose|sensitive|headache|stomach/.test(text)) return 'Wellbeing and comfort lens.';
+  if (/basketball|gym|padel|paddle|run|performance|training|sport/.test(text)) return 'Performance and training lens.';
+  if (/kid|child|daughter|grow|school|playground/.test(text) || profile.role === 'child') return 'Simple food story lens.';
+  return profile.goal || 'Personal meal lens.';
 }
 
 function MealEmoji({ meal }) {
