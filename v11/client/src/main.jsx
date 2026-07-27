@@ -30,7 +30,12 @@ function App() {
   const [plan, setPlan] = useState(null);
   const [activities, setActivities] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v11 workspace...');
+  const [status, setStatus] = useState('Loading v12.1 workspace...');
+  const [toast, setToast] = useState('');
+
+  function notify(message) {
+    setToast(message);
+  }
 
   async function refresh() {
     const [familyData, planData, activityData] = await Promise.all([api.getFamily(), api.getCurrentPlan(), api.getActivities()]);
@@ -41,7 +46,7 @@ function App() {
     setStatus(planData.plan ? 'Routine loaded.' : 'Create profiles, then generate the first routine.');
   }
 
-  useEffect(() => { refresh().catch(err => setStatus(err.message)); }, []);
+  useEffect(() => { refresh().catch(err => { setStatus(err.message); notify(err.message); }); }, []);
 
   async function saveFamily(nextFamily) {
     setFamily(nextFamily);
@@ -55,56 +60,53 @@ function App() {
     setPlan(result.plan);
     setSelectedDay(result.plan.days[0]?.dayNumber || 1);
     setActiveTab('Today');
-    setStatus(result.aiUsed ? 'AI routine generated.' : 'Local 28-day starter routine generated.');
+    notify(result.aiUsed ? 'AI routine generated.' : 'Local 28-day starter routine generated.');
   }
 
   async function adaptMeal(meal, note) {
     try {
-      setStatus('Adapting meal...');
       const result = await api.adaptMeal(plan.id, meal.id, { family, plan, activities, note });
       setPlan(result.plan);
-      setStatus(result.aiUsed ? 'Meal adapted with AI.' : 'Meal adapted locally.');
+      notify(result.aiUsed ? 'Meal adapted with AI.' : 'Meal adapted locally.');
     } catch (error) {
-      setStatus(error.message);
+      notify(error.message);
     }
   }
 
   async function adaptDay(dayNumber) {
     try {
-      setStatus('Adapting day around events...');
       const result = await api.adaptDay(plan.id, dayNumber, { family, plan, activities });
       setPlan(result.plan);
-      setStatus(result.aiUsed ? 'Day adapted with AI.' : 'Day adapted locally.');
+      notify(result.aiUsed ? 'Day adapted with AI.' : 'Day adapted locally.');
     } catch (error) {
-      setStatus(error.message);
+      notify(error.message);
     }
   }
 
   async function swapMeal(meal, targetMealId) {
-    setStatus('Swapping meals...');
     const result = await api.swapMeal(plan.id, meal.id, targetMealId);
     setPlan(result.plan);
-    setStatus('Meals swapped across the week.');
+    notify('Meals swapped across the week.');
   }
 
   async function logSymptom(payload) {
     await api.logSymptom(payload);
-    setStatus('Symptom logged.');
+    notify('Symptom logged.');
   }
 
   async function addActivity(payload) {
     const result = await api.addActivity(payload);
     setActivities(result.activities || []);
-    setStatus('Activity added. Adapt nearby meals when you want the routine to react.');
+    notify('Activity added.');
   }
 
   async function updateActivity(activityId, payload) {
     try {
       const result = await api.updateActivity(activityId, payload);
       setActivities(result.activities || []);
-      setStatus('Activity updated. Use Adapt day when you want meals to react.');
+      notify('Activity updated.');
     } catch (error) {
-      setStatus(error.message);
+      notify(error.message);
     }
   }
 
@@ -113,9 +115,9 @@ function App() {
       if (!activityId) throw new Error('Activity id missing.');
       const result = await api.deleteActivity(activityId);
       setActivities(result.activities || []);
-      setStatus('Activity removed. Use Adapt day if the meal timing should change back.');
+      notify('Activity removed.');
     } catch (error) {
-      setStatus(error.message);
+      notify(error.message);
     }
   }
 
@@ -138,13 +140,23 @@ function App() {
         </div>
       </header>
       <main className="shell">
-        <div className="status">{status}</div>
         {activeTab === 'Profiles' && <Profiles family={family} plan={plan} onChange={saveFamily} onGenerate={generatePlan} />}
         {activeTab === 'Week' && <Week plan={plan} selectedDay={selectedDay} onSelectDay={setSelectedDay} />}
         {activeTab === 'Today' && <Today family={family} plan={plan} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
       </main>
+      <Toast message={toast} onDone={() => setToast('')} />
     </>
   );
+}
+
+function Toast({ message, onDone }) {
+  useEffect(() => {
+    if (!message) return undefined;
+    const timer = setTimeout(onDone, 2500);
+    return () => clearTimeout(timer);
+  }, [message, onDone]);
+  if (!message) return null;
+  return <div className="toast" role="status" aria-live="polite">{message}</div>;
 }
 
 function Profiles({ family, plan, onChange, onGenerate }) {
@@ -175,9 +187,26 @@ function Profiles({ family, plan, onChange, onGenerate }) {
 }
 
 function ProfileCard({ profile, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const initials = profile.name?.slice(0, 2).toUpperCase() || 'P';
+
+  if (!editing) {
+    return (
+      <div className="card profileSummary">
+        <div className="avatar"><span className="avatarLetter">{initials}</span></div>
+        <div>
+          <h3>{profile.name || 'Profile'}</h3>
+          <p>{profile.goal || 'No goal set yet'}</p>
+          {profile.restrictions && <small>{profile.restrictions}</small>}
+        </div>
+        <button onClick={() => setEditing(true)}>Edit</button>
+      </div>
+    );
+  }
+
   return (
     <div className="card profile">
-      <div className="avatar"><span className="avatarLetter">{profile.name?.slice(0, 2).toUpperCase() || 'P'}</span></div>
+      <div className="profileEditHeader"><div className="avatar"><span className="avatarLetter">{initials}</span></div><button onClick={() => setEditing(false)}>Done</button></div>
       <label>Name<input value={profile.name || ''} onChange={e => onChange({ name: e.target.value })} /></label>
       <label>Goal<input value={profile.goal || ''} onChange={e => onChange({ goal: e.target.value })} /></label>
       <label>Age<input value={profile.age || ''} onChange={e => onChange({ age: e.target.value })} /></label>
@@ -235,11 +264,17 @@ function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal
 }
 
 function WeekSelector({ week, selectedDay, onSelectDay, onShift, onAdd, onAdapt }) {
+  const stripRef = useRef(null);
+  useEffect(() => {
+    const selected = stripRef.current?.querySelector('.active');
+    selected?.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' });
+  }, [selectedDay]);
+
   return (
     <div className="weekSelector">
       <div className="stripNav">
         <button className="ghostIcon" onClick={() => onShift(-1)}><Icon name="chevronLeft" /></button>
-        <div className="dayStrip">{week.map(day => {
+        <div className="dayStrip" ref={stripRef}>{week.map(day => {
           const [dow, date] = day.label.split(' ');
           const today = isToday(day);
           return <button className={day.dayNumber === selectedDay ? 'active' : ''} key={day.id} onClick={() => onSelectDay(day.dayNumber)}><b>{dow}</b><span>{date}</span>{today && <i aria-hidden="true" />}</button>;
@@ -258,6 +293,7 @@ function WeekSelector({ week, selectedDay, onSelectDay, onShift, onAdd, onAdapt 
 function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
   const split = Array.isArray(meal.memberTimings) && meal.memberTimings.length > 0;
   const [adaptOpen, setAdaptOpen] = useState(open);
+  const [adapting, setAdapting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -274,8 +310,13 @@ function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onA
   }, [menuOpen]);
 
   async function handleAdapt() {
-    await onAdapt();
-    setAdaptOpen(false);
+    setAdapting(true);
+    try {
+      await onAdapt();
+    } finally {
+      setAdapting(false);
+      setAdaptOpen(false);
+    }
   }
 
   function choose(action) {
@@ -286,7 +327,7 @@ function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onA
   return (
     <div className="agendaRow">
       <div className="time">{meal.time}</div>
-      <article className="meal">
+      <article className={adapting ? 'meal adapting' : 'meal'}>
         <div className="mealMenu" ref={menuRef}>
           <button className="iconButton" title="Meal actions" onClick={() => setMenuOpen(!menuOpen)}><Icon name="more" /></button>
           {menuOpen && <div className="actionMenu">
@@ -302,7 +343,7 @@ function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onA
         <div className="tagRow">{(meal.tags || inferTags(meal.title)).map(tag => <span className={`pill ${tag.tone}`} key={tag.label}>{tag.label}</span>)}</div>
         {split && <div className="timingChips">{meal.memberTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
         {membersOpen && <UserSpecificsInline meal={meal} family={family} />}
-        {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." /><button className="primary" onClick={handleAdapt}>Adapt this meal</button></div>}
+        {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." disabled={adapting} /><button className="primary" onClick={handleAdapt} disabled={adapting}>{adapting ? 'Adapting...' : 'Adapt this meal'}</button></div>}
       </article>
     </div>
   );
