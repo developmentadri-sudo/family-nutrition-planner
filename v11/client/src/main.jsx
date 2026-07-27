@@ -31,8 +31,9 @@ function App() {
   const [plan, setPlan] = useState(null);
   const [activities, setActivities] = useState([]);
   const [symptoms, setSymptoms] = useState([]);
+  const [mealRatings, setMealRatings] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v12.5 workspace...');
+  const [status, setStatus] = useState('Loading v12.7 workspace...');
   const [toast, setToast] = useState('');
   const [selectedPersona, setSelectedPersona] = useState(() => localStorage.getItem(personaStorageKey) || '');
   const [personaOpen, setPersonaOpen] = useState(false);
@@ -42,11 +43,12 @@ function App() {
   }
 
   async function refresh() {
-    const [familyData, planData, activityData, symptomData] = await Promise.all([api.getFamily(), api.getCurrentPlan(), api.getActivities(), api.getSymptoms()]);
+    const [familyData, planData, activityData, symptomData, ratingData] = await Promise.all([api.getFamily(), api.getCurrentPlan(), api.getActivities(), api.getSymptoms(), api.getMealRatings()]);
     setFamily(familyData);
     setPlan(planData.plan);
     setActivities(activityData.activities || []);
     setSymptoms(symptomData.symptoms || []);
+    setMealRatings(ratingData.mealRatings || []);
     setActiveTab(planData.plan ? 'Today' : 'Profiles');
     setStatus(planData.plan ? 'Routine loaded.' : 'Create profiles, then generate the first routine.');
   }
@@ -119,6 +121,12 @@ function App() {
     notify('Activity added.');
   }
 
+  async function rateMeal(payload) {
+    const result = await api.rateMeal(payload);
+    setMealRatings(result.mealRatings || []);
+    notify('Meal rating saved.');
+  }
+
   async function updateActivity(activityId, payload) {
     try {
       const result = await api.updateActivity(activityId, payload);
@@ -168,7 +176,7 @@ function App() {
         {activeTab === 'Profiles' && <Profiles family={family} plan={plan} persona={persona} onChange={saveFamily} onGenerate={generatePlan} />}
         {activeTab === 'Week' && <Week plan={plan} persona={persona} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} />}
         {activeTab === 'Symptoms' && <SymptomsPage family={family} persona={persona} symptoms={symptoms} />}
-        {activeTab === 'Today' && <Today family={family} persona={persona} plan={plan} activities={activities} symptoms={symptoms} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
+        {activeTab === 'Today' && <Today family={family} persona={persona} plan={plan} activities={activities} symptoms={symptoms} mealRatings={mealRatings} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onRateMeal={rateMeal} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
       </main>
       <Toast message={toast} onDone={() => setToast('')} />
       {personaOpen && <PersonaSelector family={family} selectedPersona={selectedPersona} onChoose={choosePersona} />}
@@ -288,7 +296,7 @@ function Week({ plan, persona, activities, selectedDay, onSelectDay }) {
   );
 }
 
-function Today({ family, persona, plan, activities, symptoms, selectedDay, onSelectDay, onAdaptMeal, onAdaptDay, onSwapMeal, onLogSymptom, onAddActivity, onUpdateActivity, onDeleteActivity }) {
+function Today({ family, persona, plan, activities, symptoms, mealRatings, selectedDay, onSelectDay, onAdaptMeal, onAdaptDay, onSwapMeal, onLogSymptom, onRateMeal, onAddActivity, onUpdateActivity, onDeleteActivity }) {
   const [open, setOpen] = useState({});
   const [memberOpen, setMemberOpen] = useState({});
   const [notes, setNotes] = useState({});
@@ -312,10 +320,11 @@ function Today({ family, persona, plan, activities, symptoms, selectedDay, onSel
       <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} onAdd={() => setEventOpen(true)} onAdapt={() => onAdaptDay(selectedDay)} />
       <PersonaContext persona={persona} day={day} activities={activities} />
       <PerformanceDayPanel persona={persona} day={day} activities={dayActivities} items={items} />
+      <KidDayPanel persona={persona} day={day} ratings={mealRatings} />
       <SymptomHistory persona={persona} symptoms={symptomsForDay(symptoms, selectedDay)} profiles={family.profiles || []} mode="day" />
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
-        : <MealCard key={item.id} meal={item} family={family} persona={persona} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} />)}</div>
+        : <MealCard key={item.id} meal={item} family={family} persona={persona} rating={ratingForMeal(mealRatings, persona, item.id)} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} onRate={value => onRateMeal({ profileId: persona.profile?.id || '', mealId: item.id, mealTitle: item.title, dayNumber: selectedDay, value })} />)}</div>
       {swapMeal && <SwapDrawer meal={swapMeal} plan={plan} onClose={() => setSwapMeal(null)} onChoose={targetId => { onSwapMeal(swapMeal, targetId); setSwapMeal(null); }} />}
       {symptomMeal && <SymptomDialog meal={symptomMeal} dayNumber={selectedDay} family={family} persona={persona} onClose={() => setSymptomMeal(null)} onSave={payload => { onLogSymptom(payload); setSymptomMeal(null); }} />}
       {eventOpen && <EventDialog dayNumber={selectedDay} family={family} onClose={() => setEventOpen(false)} onSave={payload => { onAddActivity(payload); setEventOpen(false); }} />}
@@ -454,11 +463,44 @@ function PerformanceWindow({ window }) {
   );
 }
 
-function MealCard({ meal, family, persona, open, membersOpen, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
+function KidDayPanel({ persona, day, ratings }) {
+  if (persona.type !== 'person' || !isKidProfile(persona.profile)) return null;
+  const ownRatings = ratingsForPersona(ratings, persona).filter(item => Number(item.dayNumber) === Number(day?.dayNumber));
+  const loved = ownRatings.filter(item => item.value === 'loved').length;
+  return (
+    <section className="kidPanel">
+      <div>
+        <p className="kicker">Kid view</p>
+        <h2>{kidFoodStory(day)}</h2>
+      </div>
+      <p>{kidGrowthMessage(day)}</p>
+      <div className="kidStats">
+        <span>{mealCount(day)} meals today</span>
+        <span>{ownRatings.length ? `${ownRatings.length} rated` : 'Rate meals after trying them'}</span>
+        {!!loved && <span>{loved} favorite{loved === 1 ? '' : 's'}</span>}
+      </div>
+    </section>
+  );
+}
+
+function MealRating({ rating, onRate }) {
+  return (
+    <div className="ratingRow" aria-label="Meal rating">
+      {[
+        ['loved', 'Loved it'],
+        ['ok', 'It was ok'],
+        ['no', 'Not for me']
+      ].map(([value, label]) => <button className={rating?.value === value ? 'active' : ''} key={value} onClick={() => onRate(value)}>{label}</button>)}
+    </div>
+  );
+}
+
+function MealCard({ meal, family, persona, rating, open, membersOpen, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom, onRate }) {
   const split = Array.isArray(meal.memberTimings) && meal.memberTimings.length > 0;
   const visibleTimings = timingsForPersona(meal.memberTimings || [], persona);
   const familyTime = meal.familyTime || meal.time;
   const shiftedForPersona = persona.type === 'person' && meal.time !== familyTime;
+  const showKidRating = persona.type === 'person' && isKidProfile(persona.profile);
   const [adaptOpen, setAdaptOpen] = useState(open);
   const [adapting, setAdapting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -509,6 +551,7 @@ function MealCard({ meal, family, persona, open, membersOpen, note, onToggle, on
         <h2>{meal.title} <MealEmoji meal={meal} /></h2>
         <p>{meal.description}</p>
         <div className="tagRow">{(meal.tags || inferTags(meal.title)).map(tag => <span className={`pill ${tag.tone}`} key={tag.label}>{tag.label}</span>)}</div>
+        {showKidRating && <MealRating rating={rating} onRate={onRate} />}
         {split && visibleTimings.length > 0 && <div className="timingChips">{visibleTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
         {membersOpen && <UserSpecificsInline meal={meal} family={family} persona={persona} />}
         {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." disabled={adapting} /><button className="primary" onClick={handleAdapt} disabled={adapting}>{adapting ? 'Adapting...' : 'Adapt this meal'}</button></div>}
@@ -729,6 +772,35 @@ function mealCount(day) {
 function isPerformanceProfile(profile) {
   const text = `${profile.goal || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
   return /performance|basketball|gym|padel|paddle|run|training|sport|game|active/.test(text);
+}
+
+function isKidProfile(profile) {
+  const text = `${profile.name || ''} ${profile.role || ''} ${profile.goal || ''} ${profile.preferences || ''}`.toLowerCase();
+  return /greta|kid|child|daughter|grow|school|playground/.test(text);
+}
+
+function ratingsForPersona(ratings, persona) {
+  if (persona.type !== 'person') return [];
+  return (ratings || []).filter(item => item.profileId === persona.profile.id);
+}
+
+function ratingForMeal(ratings, persona, mealId) {
+  if (persona.type !== 'person') return null;
+  return ratingsForPersona(ratings, persona).find(item => item.mealId === mealId) || null;
+}
+
+function kidFoodStory(day) {
+  const titles = (day?.meals || []).map(meal => meal.title.toLowerCase()).join(' ');
+  if (/egg|yogurt|salmon|tuna|hake|cod|tofu|lentil|chickpea|bean/.test(titles)) return 'Today has foods for strong muscles.';
+  if (/kiwi|berry|blueberry|strawberry|orange|spinach|walnut/.test(titles)) return 'Today has foods for bright energy.';
+  return 'Today has a simple food adventure.';
+}
+
+function kidGrowthMessage(day) {
+  const tags = (day?.meals || []).flatMap(meal => meal.tags || inferTags(meal.title)).map(tag => tag.label.toLowerCase());
+  if (tags.includes('protein')) return 'Protein helps your body repair, run and play. Pick what you liked after each meal.';
+  if (tags.includes('carbs')) return 'Carbs help you have energy for school, games and playground time.';
+  return 'Try the meal, notice how it feels, and mark whether you liked it.';
 }
 
 function performanceWindows(items, activities) {

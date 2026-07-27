@@ -141,6 +141,20 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { symptom, symptoms: store.symptoms });
     }
 
+    if (req.method === 'GET' && route === '/ratings') {
+      const store = await readStore();
+      return send(res, 200, { mealRatings: store.mealRatings || [] });
+    }
+
+    if (req.method === 'POST' && route === '/ratings') {
+      const rating = normalizeMealRating(body);
+      const store = await updateStore(current => ({
+        ...current,
+        mealRatings: [rating, ...(current.mealRatings || []).filter(item => !(item.profileId === rating.profileId && item.mealId === rating.mealId))]
+      }));
+      return send(res, 200, { rating, mealRatings: store.mealRatings });
+    }
+
     return send(res, 404, { error: 'Not found.' });
   } catch (error) {
     return send(res, 500, { error: error.message || 'Server error.' });
@@ -199,6 +213,18 @@ function normalizeSymptom(symptom) {
     notes: symptom.notes || '',
     tags: Array.isArray(symptom.tags) ? symptom.tags : [],
     createdAt: symptom.createdAt || new Date().toISOString()
+  };
+}
+
+function normalizeMealRating(rating) {
+  return {
+    id: rating.id || `rating-${Date.now()}`,
+    profileId: rating.profileId || '',
+    mealId: rating.mealId || '',
+    mealTitle: rating.mealTitle || '',
+    dayNumber: Number(rating.dayNumber || 0),
+    value: ['loved', 'ok', 'no'].includes(rating.value) ? rating.value : 'ok',
+    createdAt: rating.createdAt || new Date().toISOString()
   };
 }
 

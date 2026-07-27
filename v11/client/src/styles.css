@@ -133,6 +133,11 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .fuelSteps span { border-radius: 10px; background: var(--surface-1); border: .5px solid var(--line); padding: 8px; color: var(--text-secondary); font-size: 11px; line-height: 1.35; }
 .fuelSteps b { margin-bottom: 2px; color: var(--ink); font-size: 11px; }
 .performanceWindow p { color: var(--text-secondary); font-size: 12px; line-height: 1.35; }
+.kidPanel { display: grid; gap: 8px; border: .5px solid rgba(197, 156, 255, .38); border-radius: 14px; background: rgba(197, 156, 255, .12); padding: 12px; box-shadow: 0 3px 10px rgba(54, 45, 32, .04); }
+.kidPanel h2 { margin-top: 3px; font-size: 16px; font-weight: 610; }
+.kidPanel p:not(.kicker) { color: var(--text-secondary); font-size: 13px; line-height: 1.35; }
+.kidStats { display: flex; gap: 7px; flex-wrap: wrap; }
+.kidStats span { border: .5px solid rgba(197, 156, 255, .38); border-radius: 999px; background: var(--surface-2); color: var(--text-secondary); padding: 5px 9px; font-size: 11px; font-weight: 600; }
 .agenda { display: grid; gap: 0; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 0 14px; box-shadow: var(--shadow); }
 .agendaRow { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
 .agendaRow:first-child { border-top: 0; }
@@ -155,6 +160,9 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .meal > p:not(.kicker) { color: var(--text-secondary); margin-top: 6px; line-height: 1.35; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tagRow { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
 .tagRow .pill { padding: 3px 8px; font-size: 11px; background: transparent; color: var(--text-secondary); border-color: var(--line); }
+.ratingRow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.ratingRow button { min-height: 32px; border-radius: 999px; background: var(--surface-1); color: var(--text-secondary); box-shadow: none; padding: 6px 10px; font-size: 12px; font-weight: 620; }
+.ratingRow button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .adaptBox { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .timingChips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .timingChip { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; max-width: 280px; min-width: 190px; border: .5px solid var(--line); border-radius: 999px; background: var(--surface-1); padding: 6px 10px 6px 6px; }

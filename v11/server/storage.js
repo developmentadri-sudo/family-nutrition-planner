@@ -10,6 +10,7 @@ const initialStore = {
   plans: [],
   activities: [],
   symptoms: [],
+  mealRatings: [],
   aiRequests: []
 };
 
