@@ -121,6 +121,19 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .symptomItem b { font-size: 12px; font-weight: 650; }
 .symptomItem span { color: var(--text-secondary); font-size: 12px; }
 .symptomItem small { color: var(--muted); font-size: 11px; }
+.insightsPanel { display: grid; gap: 12px; border: .5px solid var(--line); border-radius: 14px; background: var(--surface-2); padding: 14px; box-shadow: 0 3px 10px rgba(54, 45, 32, .04); }
+.insightStatus { color: var(--text-secondary); font-size: 13px; line-height: 1.4; }
+.insightGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.insightCard { display: grid; gap: 3px; border: .5px solid var(--line); border-radius: 12px; background: var(--surface-1); padding: 10px; }
+.insightCard small { color: var(--muted); font-size: 10px; font-weight: 720; letter-spacing: .08em; text-transform: uppercase; }
+.insightCard b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 650; }
+.insightCard span { color: var(--text-secondary); font-size: 11px; line-height: 1.35; }
+.signalList { display: grid; gap: 6px; padding-top: 2px; }
+.signalRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; border: .5px solid rgba(255, 189, 107, .36); border-radius: 12px; background: rgba(255, 244, 220, .38); padding: 8px 10px; }
+.signalRow span, .signalRow b, .signalRow small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signalRow b { font-size: 12px; font-weight: 650; }
+.signalRow small { margin-top: 2px; color: var(--text-secondary); font-size: 11px; }
+.signalRow strong { color: var(--warn-text); font-size: 12px; font-weight: 720; }
 .performancePanel { display: grid; gap: 10px; border: .5px solid rgba(116, 167, 255, .34); border-radius: 14px; background: rgba(237, 241, 255, .42); padding: 12px; box-shadow: 0 3px 10px rgba(54, 45, 32, .04); }
 .performanceHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .performanceHeader h2 { margin-top: 3px; font-size: 16px; font-weight: 610; }
@@ -244,6 +257,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
   .headerNav { width: 100%; justify-content: space-between; }
   .personaButton { max-width: 100%; }
   .personaButton > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .insightGrid { grid-template-columns: 1fr; }
   .fuelSteps { grid-template-columns: 1fr; }
   .recipeGrid { grid-template-columns: 1fr; }
   .stripNav { grid-template-columns: 36px minmax(0, 1fr) 36px; }

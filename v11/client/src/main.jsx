@@ -35,7 +35,7 @@ function App() {
   const [symptoms, setSymptoms] = useState([]);
   const [mealRatings, setMealRatings] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v12.8 workspace...');
+  const [status, setStatus] = useState('Loading v12.9 workspace...');
   const [toast, setToast] = useState('');
   const [selectedPersona, setSelectedPersona] = useState(() => localStorage.getItem(personaStorageKey) || '');
   const [personaOpen, setPersonaOpen] = useState(false);
@@ -338,11 +338,56 @@ function Today({ family, persona, plan, activities, symptoms, mealRatings, selec
 }
 
 function SymptomsPage({ family, persona, symptoms }) {
+  const visible = symptomsForPersona(symptoms, persona);
+  const insights = symptomInsights(visible);
+
   return (
     <section className="today">
       <PersonaContext persona={persona} day={null} activities={[]} />
+      <SymptomInsights insights={insights} persona={persona} />
       <SymptomHistory persona={persona} symptoms={symptoms} profiles={family.profiles || []} mode="summary" />
     </section>
+  );
+}
+
+function SymptomInsights({ insights, persona }) {
+  const owner = persona.type === 'family' ? 'the family' : persona.profile.name;
+  return (
+    <section className="insightsPanel">
+      <div className="symptomHeader">
+        <div>
+          <p className="kicker">Pattern insights</p>
+          <h2>{insights.total ? `${insights.total} symptom logs reviewed` : 'No health signals yet'}</h2>
+        </div>
+        <span className={insights.confidence === 'Emerging' ? 'pill orange' : 'pill'}>{insights.confidence}</span>
+      </div>
+      <p className="insightStatus">{insights.summary || `Once ${owner} logs symptoms after meals, this page will start looking for repeated timing, symptom and meal patterns.`}</p>
+      <div className="insightGrid">
+        <InsightCard label="Most common symptom" value={insights.topSymptom?.label || 'Not enough data'} detail={insights.topSymptom ? `${insights.topSymptom.count} logs` : 'Log at least 5 reactions'} />
+        <InsightCard label="Meal signal" value={insights.topMeal?.label || 'No repeated meal yet'} detail={insights.topMeal ? `${insights.topMeal.count} reactions after this meal` : 'Looking for repeated meals'} />
+        <InsightCard label="Timing window" value={insights.topDelay?.label || 'No clear window'} detail={insights.topDelay ? `${insights.topDelay.count} logs in this window` : 'Delay after meal will help'} />
+      </div>
+      {!!insights.mealRows.length && (
+        <div className="signalList">
+          {insights.mealRows.map(row => (
+            <div className="signalRow" key={row.meal}>
+              <span><b>{row.meal}</b><small>{row.topSymptom} · {row.topDelay}</small></span>
+              <strong>{row.count}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function InsightCard({ label, value, detail }) {
+  return (
+    <div className="insightCard">
+      <small>{label}</small>
+      <b>{value}</b>
+      <span>{detail}</span>
+    </div>
   );
 }
 
@@ -1038,18 +1083,83 @@ function symptomsForDay(symptoms, dayNumber) {
 }
 
 function strongestSymptomPattern(symptoms) {
-  if (symptoms.length < 5) return '';
-  const bySymptom = countBy(symptoms, item => item.symptom || 'Other');
-  const topSymptom = [...bySymptom.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (topSymptom?.[1] >= 5) return `${topSymptom[0]} has been logged ${topSymptom[1]} times. Review recent meals before treating it as a true intolerance.`;
+  return symptomInsights(symptoms).patternText;
+}
 
+function symptomInsights(symptoms) {
+  const total = symptoms.length;
+  const bySymptom = countBy(symptoms, item => item.symptom || 'Other');
+  const byMeal = countBy(symptoms, item => item.mealTitle || 'meal');
+  const byDelay = countBy(symptoms, item => delayWindow(item.delay));
   const byPair = countBy(symptoms, item => `${item.symptom || 'Other'}|${item.mealTitle || 'meal'}`);
-  const topPair = [...byPair.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (topPair?.[1] >= 3) {
-    const [symptom, meal] = topPair[0].split('|');
-    return `${symptom} appears ${topPair[1]} times after ${meal}. This is worth watching over the next meals.`;
+  const topSymptom = topCount(bySymptom);
+  const topMeal = topCount(byMeal);
+  const topDelay = topCount(byDelay);
+  const topPair = topCount(byPair);
+  let summary = '';
+  let patternText = '';
+  let confidence = total >= 5 ? 'Watching' : 'Learning';
+
+  if (total < 5) {
+    summary = `Keep logging reactions after meals. Pattern discovery starts to become useful after ${5 - total} more log${5 - total === 1 ? '' : 's'}.`;
+  } else if (topPair && topPair.count >= 3) {
+    const [symptom, meal] = topPair.label.split('|');
+    confidence = 'Emerging';
+    patternText = `${symptom} appears ${topPair.count} times after ${meal}. This is worth watching over the next meals.`;
+    summary = patternText;
+  } else if (topSymptom && topSymptom.count >= 5) {
+    confidence = 'Emerging';
+    patternText = `${topSymptom.label} has been logged ${topSymptom.count} times. Review recent meals before treating it as a true intolerance.`;
+    summary = patternText;
+  } else {
+    summary = 'There are enough logs to start watching, but no repeated meal or symptom pattern is strong yet.';
   }
-  return '';
+
+  return {
+    total,
+    confidence,
+    summary,
+    patternText,
+    topSymptom,
+    topMeal,
+    topDelay,
+    mealRows: mealPatternRows(symptoms)
+  };
+}
+
+function mealPatternRows(symptoms) {
+  const groups = new Map();
+  symptoms.forEach(item => {
+    const meal = item.mealTitle || 'meal';
+    const rows = groups.get(meal) || [];
+    rows.push(item);
+    groups.set(meal, rows);
+  });
+  return [...groups.entries()]
+    .map(([meal, rows]) => ({
+      meal,
+      count: rows.length,
+      topSymptom: topCount(countBy(rows, item => item.symptom || 'Other'))?.label || 'Symptom',
+      topDelay: topCount(countBy(rows, item => delayWindow(item.delay)))?.label || 'Timing unclear'
+    }))
+    .filter(row => row.count > 1)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+}
+
+function topCount(map) {
+  const entry = [...map.entries()].sort((a, b) => b[1] - a[1])[0];
+  return entry ? { label: entry[0], count: entry[1] } : null;
+}
+
+function delayWindow(value) {
+  const text = String(value || '').toLowerCase();
+  const numeric = Number(text.match(/\d+/)?.[0]);
+  if (/min/.test(text)) return 'Within 1 hour';
+  if (!numeric) return value || 'Timing unclear';
+  if (numeric <= 1) return 'Within 1 hour';
+  if (numeric <= 3) return '1-3 hours';
+  return 'Later than 3 hours';
 }
 
 function countBy(items, keyForItem) {
