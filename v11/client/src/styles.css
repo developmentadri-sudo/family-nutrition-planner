@@ -72,6 +72,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .profile label:nth-last-child(-n + 3) { grid-column: 1 / -1; }
 .profileEditHeader { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .profileSummary { grid-column: span 4; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+.profileSummary.activeProfile { border-color: var(--accent); background: linear-gradient(0deg, rgba(85, 214, 176, .07), rgba(85, 214, 176, .07)), var(--card); }
 .profileSummary p { color: var(--muted); font-size: 13px; margin-top: 2px; }
 .profileSummary small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .avatar { width: 38px; height: 38px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: var(--card-2); border: 1px solid var(--line); color: var(--accent); font-weight: 760; line-height: 1; box-sizing: border-box; }
@@ -105,6 +106,11 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .compactAction .icon { width: 15px; height: 15px; }
 
 .today { display: grid; gap: 14px; }
+.lensBar { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 10px; border: .5px solid rgba(85, 214, 176, .36); border-radius: 14px; background: var(--bg-accent); padding: 10px 12px; }
+.lensBar.familyLens { border-color: var(--line); background: var(--surface-1); }
+.lensBar b, .lensBar span { display: block; min-width: 0; }
+.lensBar b { font-size: 13px; font-weight: 650; }
+.lensBar span { margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .agenda { display: grid; gap: 0; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 0 14px; box-shadow: var(--shadow); }
 .agendaRow { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
 .agendaRow:first-child { border-top: 0; }
@@ -151,6 +157,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .weekCard { display: grid; gap: 8px; text-align: left; border-radius: 18px; padding: 14px; background: var(--card); }
 .weekCard.active { background: var(--card-2); border-color: var(--accent); color: var(--ink); }
 .weekCard span { display: block; color: var(--muted); font-size: 13px; line-height: 1.35; }
+.weekCard small { color: var(--text-secondary); font-size: 12px; font-weight: 560; }
 .drawer { position: fixed; inset: 0; z-index: 50; }
 .shade { position: absolute; inset: 0; background: rgba(0, 0, 0, .35); }
 .drawer aside { position: absolute; right: 0; top: 0; bottom: 0; width: min(440px, 100%); overflow: auto; display: grid; align-content: start; gap: 12px; background: var(--card); border-left: 1px solid var(--line); border-radius: 16px 0 0 16px; padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom)); box-shadow: var(--shadow); }

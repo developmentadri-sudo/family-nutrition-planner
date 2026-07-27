@@ -31,7 +31,7 @@ function App() {
   const [plan, setPlan] = useState(null);
   const [activities, setActivities] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v12.2 workspace...');
+  const [status, setStatus] = useState('Loading v12.3 workspace...');
   const [toast, setToast] = useState('');
   const [selectedPersona, setSelectedPersona] = useState(() => localStorage.getItem(personaStorageKey) || '');
   const [personaOpen, setPersonaOpen] = useState(false);
@@ -138,6 +138,7 @@ function App() {
   }
 
   if (!family) return <main className="shell"><section className="card">{status}</section></main>;
+  const persona = activePersona(selectedPersona, family);
 
   return (
     <>
@@ -160,9 +161,9 @@ function App() {
         </div>
       </header>
       <main className="shell">
-        {activeTab === 'Profiles' && <Profiles family={family} plan={plan} onChange={saveFamily} onGenerate={generatePlan} />}
-        {activeTab === 'Week' && <Week plan={plan} selectedDay={selectedDay} onSelectDay={setSelectedDay} />}
-        {activeTab === 'Today' && <Today family={family} plan={plan} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
+        {activeTab === 'Profiles' && <Profiles family={family} plan={plan} persona={persona} onChange={saveFamily} onGenerate={generatePlan} />}
+        {activeTab === 'Week' && <Week plan={plan} persona={persona} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} />}
+        {activeTab === 'Today' && <Today family={family} persona={persona} plan={plan} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
       </main>
       <Toast message={toast} onDone={() => setToast('')} />
       {personaOpen && <PersonaSelector family={family} selectedPersona={selectedPersona} onChoose={choosePersona} />}
@@ -208,7 +209,7 @@ function Toast({ message, onDone }) {
   return <div className="toast" role="status" aria-live="polite">{message}</div>;
 }
 
-function Profiles({ family, plan, onChange, onGenerate }) {
+function Profiles({ family, plan, persona, onChange, onGenerate }) {
   const [note, setNote] = useState('');
   const profiles = family.profiles || [];
   const updateProfile = (id, patch) => onChange({ ...family, profiles: profiles.map(p => p.id === id ? { ...p, ...patch } : p) });
@@ -225,7 +226,7 @@ function Profiles({ family, plan, onChange, onGenerate }) {
         <span className="pill blue">{plan ? `${plan.days.length} days planned` : 'No plan yet'}</span>
         <span className="muted">{plan?.summary || 'Generate a plan after adding at least one profile.'}</span>
       </div>
-      {profiles.map(profile => <ProfileCard key={profile.id} profile={profile} onChange={patch => updateProfile(profile.id, patch)} />)}
+      {profiles.map(profile => <ProfileCard key={profile.id} profile={profile} active={persona.type === 'person' && persona.profile.id === profile.id} onChange={patch => updateProfile(profile.id, patch)} />)}
       <div className="card span12 aiPanel">
         <h2>Generate Plan</h2>
         <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="This week is very active, avoid salmon, Ruth has padel at 19:00..." />
@@ -235,13 +236,13 @@ function Profiles({ family, plan, onChange, onGenerate }) {
   );
 }
 
-function ProfileCard({ profile, onChange }) {
+function ProfileCard({ profile, active, onChange }) {
   const [editing, setEditing] = useState(false);
   const initials = profile.name?.slice(0, 2).toUpperCase() || 'P';
 
   if (!editing) {
     return (
-      <div className="card profileSummary">
+      <div className={active ? 'card profileSummary activeProfile' : 'card profileSummary'}>
         <div className="avatar"><span className="avatarLetter">{initials}</span></div>
         <div>
           <h3>{profile.name || 'Profile'}</h3>
@@ -268,20 +269,21 @@ function ProfileCard({ profile, onChange }) {
   );
 }
 
-function Week({ plan, selectedDay, onSelectDay }) {
+function Week({ plan, persona, activities, selectedDay, onSelectDay }) {
   if (!plan) return <Empty title="No week plan yet" />;
   const week = weekDays(plan, weekOf(selectedDay));
   return (
     <section className="today">
       <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} />
+      <PersonaContext persona={persona} day={plan.days.find(d => d.dayNumber === selectedDay)} activities={activities} />
       <div className="weekGrid">
-        {week.map(day => <button className={day.dayNumber === selectedDay ? 'weekCard active' : 'weekCard'} key={day.id} onClick={() => onSelectDay(day.dayNumber)}><b>{day.label}</b>{day.meals.map(meal => <span key={meal.id}>{mealLabels[meal.type]}: {meal.title}</span>)}</button>)}
+        {week.map(day => <button className={day.dayNumber === selectedDay ? 'weekCard active' : 'weekCard'} key={day.id} onClick={() => onSelectDay(day.dayNumber)}><b>{day.label}</b>{day.meals.map(meal => <span key={meal.id}>{mealLabels[meal.type]}: {meal.title}</span>)}<small>{dayLensSummary(day, activities, persona)}</small></button>)}
       </div>
     </section>
   );
 }
 
-function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal, onAdaptDay, onSwapMeal, onLogSymptom, onAddActivity, onUpdateActivity, onDeleteActivity }) {
+function Today({ family, persona, plan, activities, selectedDay, onSelectDay, onAdaptMeal, onAdaptDay, onSwapMeal, onLogSymptom, onAddActivity, onUpdateActivity, onDeleteActivity }) {
   const [open, setOpen] = useState({});
   const [memberOpen, setMemberOpen] = useState({});
   const [notes, setNotes] = useState({});
@@ -292,7 +294,8 @@ function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal
   const weekNumber = weekOf(selectedDay);
   const week = weekDays(plan, weekNumber);
   const day = useMemo(() => plan?.days.find(d => d.dayNumber === selectedDay), [plan, selectedDay]);
-  const items = useMemo(() => agendaItems(day, activities), [day, activities]);
+  const visibleActivities = useMemo(() => activitiesForPersona(activities, persona), [activities, persona]);
+  const items = useMemo(() => agendaItems(day, visibleActivities), [day, visibleActivities]);
   if (!plan || !day) return <Empty title="No routine generated yet" />;
   async function handleMealAdapt(meal) {
     await onAdaptMeal(meal, notes[meal.id] || '');
@@ -301,11 +304,12 @@ function Today({ family, plan, activities, selectedDay, onSelectDay, onAdaptMeal
   return (
     <section className="today">
       <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} onAdd={() => setEventOpen(true)} onAdapt={() => onAdaptDay(selectedDay)} />
+      <PersonaContext persona={persona} day={day} activities={activities} />
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
-        : <MealCard key={item.id} meal={item} family={family} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} />)}</div>
+        : <MealCard key={item.id} meal={item} family={family} persona={persona} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} />)}</div>
       {swapMeal && <SwapDrawer meal={swapMeal} plan={plan} onClose={() => setSwapMeal(null)} onChoose={targetId => { onSwapMeal(swapMeal, targetId); setSwapMeal(null); }} />}
-      {symptomMeal && <SymptomDialog meal={symptomMeal} family={family} onClose={() => setSymptomMeal(null)} onSave={payload => { onLogSymptom(payload); setSymptomMeal(null); }} />}
+      {symptomMeal && <SymptomDialog meal={symptomMeal} family={family} persona={persona} onClose={() => setSymptomMeal(null)} onSave={payload => { onLogSymptom(payload); setSymptomMeal(null); }} />}
       {eventOpen && <EventDialog dayNumber={selectedDay} family={family} onClose={() => setEventOpen(false)} onSave={payload => { onAddActivity(payload); setEventOpen(false); }} />}
       {editingEvent && <EventDialog dayNumber={selectedDay} family={family} activity={editingEvent} onClose={() => setEditingEvent(null)} onSave={payload => { onUpdateActivity(editingEvent.id, payload); setEditingEvent(null); }} />}
     </section>
@@ -339,8 +343,24 @@ function WeekSelector({ week, selectedDay, onSelectDay, onShift, onAdd, onAdapt 
   );
 }
 
-function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
+function PersonaContext({ persona, day, activities }) {
+  const activityCount = activitiesForPersona(activities.filter(activity => Number(activity.dayNumber) === Number(day?.dayNumber)), persona).length;
+  const title = persona.type === 'family' ? 'Family view' : `${persona.profile.name}'s day`;
+  const text = persona.type === 'family'
+    ? 'Shared plan first, with individual timing and adjustments available inside each meal.'
+    : personaDayMessage(persona.profile, day, activityCount);
+
+  return (
+    <section className={persona.type === 'family' ? 'lensBar familyLens' : 'lensBar'}>
+      <span className="avatar mini"><span className="avatarLetter">{persona.type === 'family' ? 'FA' : persona.profile.name?.slice(0, 2).toUpperCase()}</span></span>
+      <div><b>{title}</b><span>{text}</span></div>
+    </section>
+  );
+}
+
+function MealCard({ meal, family, persona, open, membersOpen, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
   const split = Array.isArray(meal.memberTimings) && meal.memberTimings.length > 0;
+  const visibleTimings = timingsForPersona(meal.memberTimings || [], persona);
   const [adaptOpen, setAdaptOpen] = useState(open);
   const [adapting, setAdapting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -382,7 +402,7 @@ function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onA
           {menuOpen && <div className="actionMenu">
             <button onClick={() => choose(onSwap)}><Icon name="swap" /> Swap meal</button>
             <button onClick={() => choose(() => { setAdaptOpen(true); onToggle(); })}><Icon name="ai" /> Suggest variation</button>
-            <button onClick={() => choose(onMembers)}><Icon name="user" /> User specifics</button>
+            <button onClick={() => choose(onMembers)}><Icon name="user" /> {persona.type === 'family' ? 'User specifics' : 'My specifics'}</button>
             <button onClick={() => choose(onSymptom)}><Icon name="symptom" /> Log symptoms</button>
           </div>}
         </div>
@@ -390,8 +410,8 @@ function MealCard({ meal, family, open, membersOpen, note, onToggle, onNote, onA
         <h2>{meal.title} <MealEmoji meal={meal} /></h2>
         <p>{meal.description}</p>
         <div className="tagRow">{(meal.tags || inferTags(meal.title)).map(tag => <span className={`pill ${tag.tone}`} key={tag.label}>{tag.label}</span>)}</div>
-        {split && <div className="timingChips">{meal.memberTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
-        {membersOpen && <UserSpecificsInline meal={meal} family={family} />}
+        {split && visibleTimings.length > 0 && <div className="timingChips">{visibleTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
+        {membersOpen && <UserSpecificsInline meal={meal} family={family} persona={persona} />}
         {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." disabled={adapting} /><button className="primary" onClick={handleAdapt} disabled={adapting}>{adapting ? 'Adapting...' : 'Adapt this meal'}</button></div>}
       </article>
     </div>
@@ -419,8 +439,8 @@ function EventTimingChip({ activity, person, onEdit, onDelete }) {
   return <div className="timingChip eventChip"><span className="chipAvatar"><span className="avatarLetter">{person.profileName?.slice(0, 1).toUpperCase() || 'P'}</span></span><div><b>{person.profileName || 'Family'} · <em>{activity.time}</em></b><span>Manual event</span></div><div className="eventActions"><button title="Edit event" onClick={event => { event.stopPropagation(); onEdit(person); }}><Icon name="edit" /></button><button title="Remove event" onClick={event => { event.stopPropagation(); onDelete(person.id); }}><Icon name="trash" /></button></div></div>;
 }
 
-function UserSpecificsInline({ meal, family }) {
-  const notes = memberNotesForMeal(meal, family.profiles || []);
+function UserSpecificsInline({ meal, family, persona }) {
+  const notes = memberNotesForMeal(meal, profilesForPersona(family.profiles || [], persona));
   return (
     <div className="inlineSpecifics">
       {notes.map(item => (
@@ -443,8 +463,8 @@ function MemberDrawer({ meal, family, onClose }) {
   return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>User Specifics</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><div className="memberList">{notes.map(item => <section className="memberNote" key={item.profileId}><div className="avatar"><span className="avatarLetter">{item.name?.slice(0, 2).toUpperCase() || 'P'}</span></div><div><h3>{item.name}</h3><p>{item.note}</p></div></section>)}</div></aside></div>;
 }
 
-function SymptomDialog({ meal, family, onSave, onClose }) {
-  const [profileId, setProfileId] = useState(family.profiles[0]?.id || '');
+function SymptomDialog({ meal, family, persona, onSave, onClose }) {
+  const [profileId, setProfileId] = useState(persona.type === 'person' ? persona.profile.id : family.profiles[0]?.id || '');
   const [delay, setDelay] = useState('1 hour');
   const [symptom, setSymptom] = useState('Headache');
   return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>Log Symptom</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><label>Profile<select value={profileId} onChange={e => setProfileId(e.target.value)}>{family.profiles.map(profile => <option value={profile.id} key={profile.id}>{profile.name}</option>)}</select></label><label>Time since meal<select value={delay} onChange={e => setDelay(e.target.value)}>{['30 minutes', '1 hour', '2 hours', '4 hours', 'Next morning'].map(item => <option key={item}>{item}</option>)}</select></label><label>Symptom<select value={symptom} onChange={e => setSymptom(e.target.value)}>{['Headache', 'Bloating', 'Cramps', 'Nausea', 'Reflux', 'Fatigue', 'Other'].map(item => <option key={item}>{item}</option>)}</select></label><button className="primary" onClick={() => onSave({ profileId, mealId: meal.id, mealTitle: meal.title, delay, symptom })}>OK</button></aside></div>;
@@ -565,6 +585,46 @@ function profileAlternativeTitle(title, type, diet) {
   if (/quinoa/.test(text)) return 'chickpea quinoa bowl';
   if (/pasta/.test(text)) return 'lentil pasta bowl';
   return diet === 'pescetarian' ? 'fish, eggs or legumes' : 'eggs, tofu or legumes';
+}
+
+function activePersona(personaId, family) {
+  const profile = (family?.profiles || []).find(item => item.id === personaId);
+  if (profile) return { type: 'person', id: profile.id, profile };
+  return { type: 'family', id: 'family' };
+}
+
+function profilesForPersona(profiles, persona) {
+  if (persona.type === 'family') return profiles;
+  return profiles.filter(profile => profile.id === persona.profile.id);
+}
+
+function activitiesForPersona(activities, persona) {
+  if (persona.type === 'family') return activities;
+  return activities.filter(activity => activity.profileId === persona.profile.id);
+}
+
+function timingsForPersona(timings, persona) {
+  if (persona.type === 'family') return timings;
+  return timings.filter(item => item.profileId === persona.profile.id || item.name === persona.profile.name);
+}
+
+function personaDayMessage(profile, day, activityCount) {
+  const context = `${profile.goal || ''} ${profile.restrictions || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
+  const activityText = activityCount ? `${activityCount} activity ${activityCount === 1 ? 'event' : 'events'} today` : 'no activity events logged today';
+  if (/gut|reflux|bloat|lactose|sensitive|headache|stomach/.test(context)) return `Comfort lens active: ${activityText}; meal notes focus on tolerance and gentle swaps.`;
+  if (/basketball|gym|padel|paddle|run|performance|training|sport/.test(context)) return `Performance lens active: ${activityText}; timing and carbs are the main levers.`;
+  if (/kid|child|daughter|grow|school|playground/.test(context) || profile.role === 'child') return `Kid lens active: ${mealCount(day)} meals today, with simple reasons and fun food cues coming next.`;
+  return `${profile.goal || 'Personal lens'}: ${activityText}; open My specifics on any meal for tailored adjustments.`;
+}
+
+function dayLensSummary(day, activities, persona) {
+  const count = activitiesForPersona(activities.filter(activity => Number(activity.dayNumber) === Number(day.dayNumber)), persona).length;
+  if (persona.type === 'family') return count ? `${count} family events` : 'Shared routine';
+  return count ? `${persona.profile.name}: ${count} event${count === 1 ? '' : 's'}` : `${persona.profile.name}: meals only`;
+}
+
+function mealCount(day) {
+  return day?.meals?.length || 0;
 }
 
 function personaLabel(personaId, family) {
