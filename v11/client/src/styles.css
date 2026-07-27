@@ -121,6 +121,18 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .symptomItem b { font-size: 12px; font-weight: 650; }
 .symptomItem span { color: var(--text-secondary); font-size: 12px; }
 .symptomItem small { color: var(--muted); font-size: 11px; }
+.performancePanel { display: grid; gap: 10px; border: .5px solid rgba(116, 167, 255, .34); border-radius: 14px; background: rgba(237, 241, 255, .42); padding: 12px; box-shadow: 0 3px 10px rgba(54, 45, 32, .04); }
+.performanceHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.performanceHeader h2 { margin-top: 3px; font-size: 16px; font-weight: 610; }
+.performanceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+.performanceWindow { display: grid; gap: 8px; border: .5px solid rgba(116, 167, 255, .34); border-radius: 12px; background: var(--surface-2); padding: 10px; }
+.performanceWindow b, .performanceWindow span { display: block; min-width: 0; }
+.performanceWindow > div:first-child b { font-size: 13px; font-weight: 650; }
+.performanceWindow > div:first-child span { margin-top: 2px; color: var(--pro-text); font-size: 12px; }
+.fuelSteps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fuelSteps span { border-radius: 10px; background: var(--surface-1); border: .5px solid var(--line); padding: 8px; color: var(--text-secondary); font-size: 11px; line-height: 1.35; }
+.fuelSteps b { margin-bottom: 2px; color: var(--ink); font-size: 11px; }
+.performanceWindow p { color: var(--text-secondary); font-size: 12px; line-height: 1.35; }
 .agenda { display: grid; gap: 0; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 0 14px; box-shadow: var(--shadow); }
 .agendaRow { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
 .agendaRow:first-child { border-top: 0; }
@@ -200,6 +212,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
   .headerNav { width: 100%; justify-content: space-between; }
   .personaButton { max-width: 100%; }
   .personaButton > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fuelSteps { grid-template-columns: 1fr; }
   .stripNav { grid-template-columns: 36px minmax(0, 1fr) 36px; }
   .stripActions { grid-column: 1 / -1; justify-content: flex-end; padding-left: 0; border-left: 0; }
   .agendaRow { grid-template-columns: 52px minmax(0, 1fr); gap: 8px; }

@@ -32,7 +32,7 @@ function App() {
   const [activities, setActivities] = useState([]);
   const [symptoms, setSymptoms] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v12.4 workspace...');
+  const [status, setStatus] = useState('Loading v12.5 workspace...');
   const [toast, setToast] = useState('');
   const [selectedPersona, setSelectedPersona] = useState(() => localStorage.getItem(personaStorageKey) || '');
   const [personaOpen, setPersonaOpen] = useState(false);
@@ -301,6 +301,7 @@ function Today({ family, persona, plan, activities, symptoms, selectedDay, onSel
   const day = useMemo(() => plan?.days.find(d => d.dayNumber === selectedDay), [plan, selectedDay]);
   const visibleActivities = useMemo(() => activitiesForPersona(activities, persona), [activities, persona]);
   const items = useMemo(() => agendaItems(day, visibleActivities, persona), [day, visibleActivities, persona]);
+  const dayActivities = useMemo(() => visibleActivities.filter(activity => Number(activity.dayNumber) === Number(selectedDay)), [visibleActivities, selectedDay]);
   if (!plan || !day) return <Empty title="No routine generated yet" />;
   async function handleMealAdapt(meal) {
     await onAdaptMeal(meal, notes[meal.id] || '');
@@ -310,6 +311,7 @@ function Today({ family, persona, plan, activities, symptoms, selectedDay, onSel
     <section className="today">
       <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} onAdd={() => setEventOpen(true)} onAdapt={() => onAdaptDay(selectedDay)} />
       <PersonaContext persona={persona} day={day} activities={activities} />
+      <PerformanceDayPanel persona={persona} day={day} activities={dayActivities} items={items} />
       <SymptomHistory persona={persona} symptoms={symptomsForDay(symptoms, selectedDay)} profiles={family.profiles || []} mode="day" />
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
@@ -409,6 +411,46 @@ function SymptomItem({ symptom, profiles, persona }) {
       <span>{symptom.delay} after {symptom.mealTitle || 'meal'}</span>
       <small>{symptom.dayNumber ? `Day ${symptom.dayNumber}` : formatShortDate(symptom.createdAt)}</small>
     </div>
+  );
+}
+
+function PerformanceDayPanel({ persona, day, activities, items }) {
+  if (persona.type !== 'person' || !isPerformanceProfile(persona.profile)) return null;
+  const windows = performanceWindows(items, activities);
+  const title = activities.length
+    ? `${activities.length} training ${activities.length === 1 ? 'event' : 'events'} today`
+    : 'Performance day mode';
+
+  return (
+    <section className="performancePanel">
+      <div className="performanceHeader">
+        <div>
+          <p className="kicker">Performance mode</p>
+          <h2>{title}</h2>
+        </div>
+        <span className="pill blue">{mealCount(day)} meals</span>
+      </div>
+      {!activities.length && <p className="muted">Add a gym, basketball, padel or running event to get timing notes for pre-session fuel and recovery.</p>}
+      {!!activities.length && <div className="performanceGrid">
+        {windows.map(window => <PerformanceWindow window={window} key={window.activity.id || `${window.activity.type}-${window.activity.time}`} />)}
+      </div>}
+    </section>
+  );
+}
+
+function PerformanceWindow({ window }) {
+  return (
+    <article className="performanceWindow">
+      <div>
+        <b>{window.activity.type} · {window.activity.time}</b>
+        <span>{window.intensity}</span>
+      </div>
+      <div className="fuelSteps">
+        <span><b>Before</b>{window.before}</span>
+        <span><b>After</b>{window.after}</span>
+      </div>
+      <p>{window.recommendation}</p>
+    </article>
   );
 }
 
@@ -682,6 +724,58 @@ function dayLensSummary(day, activities, persona) {
 
 function mealCount(day) {
   return day?.meals?.length || 0;
+}
+
+function isPerformanceProfile(profile) {
+  const text = `${profile.goal || ''} ${profile.activities || ''} ${profile.preferences || ''}`.toLowerCase();
+  return /performance|basketball|gym|padel|paddle|run|training|sport|game|active/.test(text);
+}
+
+function performanceWindows(items, activities) {
+  const meals = (items || []).filter(item => item.kind === 'meal');
+  return [...activities].sort((a, b) => toMinutes(a.time) - toMinutes(b.time)).map(activity => {
+    const beforeMeal = [...meals].reverse().find(meal => toMinutes(meal.time) <= toMinutes(activity.time));
+    const afterMeal = meals.find(meal => toMinutes(meal.time) > toMinutes(activity.time));
+    return {
+      activity,
+      intensity: performanceIntensity(activity.type),
+      before: beforeFuelText(activity, beforeMeal),
+      after: afterFuelText(activity, afterMeal),
+      recommendation: performanceRecommendation(activity, beforeMeal, afterMeal)
+    };
+  });
+}
+
+function performanceIntensity(type) {
+  const text = String(type || '').toLowerCase();
+  if (/basket|game|match|padel|paddle|run/.test(text)) return 'Higher intensity';
+  if (/gym|strength|weights/.test(text)) return 'Strength session';
+  return 'Active session';
+}
+
+function beforeFuelText(activity, meal) {
+  if (!meal) return 'No meal before it. Consider a light carb bite 30-60 min before.';
+  const gap = toMinutes(activity.time) - toMinutes(meal.time);
+  if (gap < 60) return `${mealLabels[meal.type]} is ${gap} min before. Keep it light and low fat.`;
+  if (gap <= 180) return `${mealLabels[meal.type]} at ${meal.time} is well placed. Keep carbs steady.`;
+  return `${mealLabels[meal.type]} is over 3h before. Add a small carb snack closer to training.`;
+}
+
+function afterFuelText(activity, meal) {
+  if (!meal) return 'No planned meal after. Add recovery with carbs, protein and fluids.';
+  const gap = toMinutes(meal.time) - toMinutes(activity.time);
+  if (gap <= 90) return `${mealLabels[meal.type]} at ${meal.time} can be the recovery meal.`;
+  return `${mealLabels[meal.type]} is ${Math.round(gap / 60)}h later. Use a recovery snack first.`;
+}
+
+function performanceRecommendation(activity, beforeMeal, afterMeal) {
+  const type = String(activity.type || '').toLowerCase();
+  const beforeGap = beforeMeal ? toMinutes(activity.time) - toMinutes(beforeMeal.time) : 999;
+  const afterGap = afterMeal ? toMinutes(afterMeal.time) - toMinutes(activity.time) : 999;
+  if (beforeGap < 60) return 'Keep pre-session food small: banana, rice cake or toast; save the larger meal for after.';
+  if (afterGap > 90) return 'Plan a recovery bridge after training: yogurt or soy yogurt with fruit, or rice cakes plus protein.';
+  if (/basket|game|match|padel|paddle|run/.test(type)) return 'Prioritize easy carbs before and a protein-carb recovery meal after.';
+  return 'Keep protein present and add an easy carb side if the session feels demanding.';
 }
 
 function symptomsForPersona(symptoms, persona) {
