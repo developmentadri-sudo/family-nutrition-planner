@@ -6,6 +6,7 @@ import './styles.css';
 const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 const planStart = new Date(2026, 6, 6);
 const personaStorageKey = 'family-nutrition-planner-persona';
+const shoppingStorageKey = 'family-nutrition-planner-shopping';
 
 function Icon({ name }) {
   const paths = {
@@ -34,7 +35,7 @@ function App() {
   const [symptoms, setSymptoms] = useState([]);
   const [mealRatings, setMealRatings] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v12.7 workspace...');
+  const [status, setStatus] = useState('Loading v12.8 workspace...');
   const [toast, setToast] = useState('');
   const [selectedPersona, setSelectedPersona] = useState(() => localStorage.getItem(personaStorageKey) || '');
   const [personaOpen, setPersonaOpen] = useState(false);
@@ -163,6 +164,7 @@ function App() {
             <div className="viewToggle" aria-label="View mode">
               <button className={activeTab === 'Today' ? 'active' : ''} onClick={() => setActiveTab('Today')}>Day</button>
               <button className={activeTab === 'Week' ? 'active' : ''} onClick={() => setActiveTab('Week')}>Week</button>
+              <button className={activeTab === 'Shopping' ? 'active' : ''} onClick={() => setActiveTab('Shopping')}>Shopping</button>
               <button className={activeTab === 'Symptoms' ? 'active' : ''} onClick={() => setActiveTab('Symptoms')}>Symptoms</button>
               <button className={activeTab === 'Profiles' ? 'active' : ''} onClick={() => setActiveTab('Profiles')}>Profiles</button>
             </div>
@@ -176,6 +178,7 @@ function App() {
       <main className="shell">
         {activeTab === 'Profiles' && <Profiles family={family} plan={plan} persona={persona} onChange={saveFamily} onGenerate={generatePlan} />}
         {activeTab === 'Week' && <Week plan={plan} persona={persona} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} />}
+        {activeTab === 'Shopping' && <ShoppingPage plan={plan} persona={persona} selectedDay={selectedDay} />}
         {activeTab === 'Symptoms' && <SymptomsPage family={family} persona={persona} symptoms={symptoms} />}
         {activeTab === 'Today' && <Today family={family} persona={persona} plan={plan} activities={activities} symptoms={symptoms} mealRatings={mealRatings} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onRateMeal={rateMeal} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
       </main>
@@ -339,6 +342,55 @@ function SymptomsPage({ family, persona, symptoms }) {
     <section className="today">
       <PersonaContext persona={persona} day={null} activities={[]} />
       <SymptomHistory persona={persona} symptoms={symptoms} profiles={family.profiles || []} mode="summary" />
+    </section>
+  );
+}
+
+function ShoppingPage({ plan, persona, selectedDay }) {
+  const [checked, setChecked] = useState(() => readShoppingChecks());
+  if (!plan) return <Empty title="No shopping list yet" />;
+  const week = weekDays(plan, weekOf(selectedDay));
+  const sections = shoppingSectionsForWeek(week);
+  const totalItems = sections.reduce((sum, section) => sum + section.items.length, 0);
+  const checkedCount = sections.reduce((sum, section) => sum + section.items.filter(item => checked[item.key]).length, 0);
+
+  function toggleItem(key) {
+    setChecked(current => {
+      const next = { ...current, [key]: !current[key] };
+      localStorage.setItem(shoppingStorageKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  return (
+    <section className="today">
+      <div className="shoppingHeader">
+        <div>
+          <p className="kicker">{weekRange(week)} grocery list</p>
+          <h2>{totalItems} items for the family plan</h2>
+          <p>{persona.type === 'family' ? 'Shared list from this week of meals.' : `Shopping with ${persona.profile.name}'s lens active; family quantities stay consolidated.`}</p>
+        </div>
+        <span className="pill green">{checkedCount} checked</span>
+      </div>
+      <div className="shoppingGrid">
+        {sections.map(section => <ShoppingSection section={section} checked={checked} onToggle={toggleItem} key={section.name} />)}
+      </div>
+    </section>
+  );
+}
+
+function ShoppingSection({ section, checked, onToggle }) {
+  return (
+    <section className="shoppingSection">
+      <h3>{section.name}</h3>
+      <div className="shoppingItems">
+        {section.items.map(item => (
+          <label className={checked[item.key] ? 'shoppingItem checked' : 'shoppingItem'} key={item.key}>
+            <input type="checkbox" checked={!!checked[item.key]} onChange={() => onToggle(item.key)} />
+            <span><b>{item.label}</b><small>{item.count} meal{item.count === 1 ? '' : 's'}</small></span>
+          </label>
+        ))}
+      </div>
     </section>
   );
 }
@@ -877,6 +929,55 @@ function recipeSteps(title, type) {
   if (/lentil|chickpea|bean|tofu/.test(text)) return ['Warm or cook the protein base.', 'Add the carb and vegetables.', 'Season gently and adjust portions by profile.'];
   if (type === 'snack') return ['Plate the fruit or base snack.', 'Add the tolerated protein or topping.', 'Keep it light if activity is close.'];
   return ['Prepare the base ingredients.', 'Cook simply with gentle seasoning.', 'Adjust portions and add-ons by profile.'];
+}
+
+function shoppingSectionsForWeek(week) {
+  const map = new Map();
+  for (const day of week) {
+    for (const meal of day.meals || []) {
+      for (const ingredient of recipeIngredients(meal.title, meal.type)) {
+        const label = normalizeShoppingLabel(ingredient);
+        const category = shoppingCategory(label);
+        const key = `${category}|${label}`.toLowerCase();
+        const current = map.get(key) || { key, label, category, count: 0 };
+        current.count += 1;
+        map.set(key, current);
+      }
+    }
+  }
+  const order = ['Protein', 'Produce', 'Carbs', 'Dairy and Alternatives', 'Pantry', 'Other'];
+  return order.map(name => ({
+    name,
+    items: [...map.values()]
+      .filter(item => item.category === name)
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+  })).filter(section => section.items.length);
+}
+
+function normalizeShoppingLabel(value) {
+  return String(value || '')
+    .replace(/\bor\b.*$/i, '')
+    .replace(/\bif needed\b|\bif tolerated\b|\btolerated\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function shoppingCategory(label) {
+  const text = label.toLowerCase();
+  if (/egg|fish|prawn|salmon|hake|cod|tuna|bonito|legume|tofu|protein/.test(text)) return 'Protein';
+  if (/berry|berries|kiwi|banana|fruit|tomato|spinach|zucchini|broccoli|green bean|cucumber|carrot|vegetable|salad/.test(text)) return 'Produce';
+  if (/rice|quinoa|potato|toast|bread|oat|pasta|cake/.test(text)) return 'Carbs';
+  if (/yogurt|kefir|milk|cheese|dairy/.test(text)) return 'Dairy and Alternatives';
+  if (/olive oil|lemon|seasoning|seed|walnut|chia|herb/.test(text)) return 'Pantry';
+  return 'Other';
+}
+
+function readShoppingChecks() {
+  try {
+    return JSON.parse(localStorage.getItem(shoppingStorageKey) || '{}');
+  } catch {
+    return {};
+  }
 }
 
 function performanceWindows(items, activities) {

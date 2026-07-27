@@ -194,6 +194,20 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .recipeAdjustments { display: grid; gap: 6px; }
 .recipeAdjustments span { display: block; border: .5px solid var(--line); border-radius: 12px; background: var(--surface-1); color: var(--text-secondary); padding: 8px 10px; font-size: 12px; line-height: 1.35; }
 .recipeAdjustments b { display: block; color: var(--ink); margin-bottom: 2px; }
+.shoppingHeader { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: .5px solid var(--line); border-radius: 14px; background: var(--surface-2); padding: 14px; box-shadow: 0 3px 10px rgba(54, 45, 32, .04); }
+.shoppingHeader h2 { margin-top: 3px; font-size: 18px; font-weight: 620; }
+.shoppingHeader p:not(.kicker) { margin-top: 4px; color: var(--text-secondary); font-size: 13px; line-height: 1.35; }
+.shoppingGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.shoppingSection { display: grid; gap: 10px; border: .5px solid var(--line); border-radius: 14px; background: var(--surface-2); padding: 14px; box-shadow: 0 3px 10px rgba(54, 45, 32, .04); }
+.shoppingSection h3 { font-size: 15px; font-weight: 620; }
+.shoppingItems { display: grid; gap: 7px; }
+.shoppingItem { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 9px; border: .5px solid var(--line); border-radius: 12px; background: var(--surface-1); padding: 9px 10px; color: var(--ink); }
+.shoppingItem input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.shoppingItem b, .shoppingItem small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shoppingItem b { font-size: 12px; font-weight: 630; }
+.shoppingItem small { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.shoppingItem.checked { opacity: .52; filter: grayscale(.45); }
+.shoppingItem.checked b { text-decoration: line-through; }
 .weekGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .weekCard { display: grid; gap: 8px; text-align: left; border-radius: 18px; padding: 14px; background: var(--card); }
 .weekCard.active { background: var(--card-2); border-color: var(--accent); color: var(--ink); }
