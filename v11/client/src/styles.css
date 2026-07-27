@@ -184,6 +184,16 @@ header p, .card p, .status, .muted { color: var(--muted); }
 .specificChip b, .specificChip span { display: block; min-width: 0; }
 .specificChip b { font-size: 12px; font-weight: 650; }
 .specificChip span { color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 2px; }
+.recipeCard { display: grid; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.recipeHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.recipeHeader h3 { margin-top: 3px; font-size: 15px; font-weight: 620; }
+.recipeGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.recipeGrid > div { border: .5px solid var(--line); border-radius: 12px; background: var(--surface-1); padding: 10px; }
+.recipeGrid b { display: block; margin-bottom: 6px; font-size: 12px; }
+.recipeGrid ul, .recipeGrid ol { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+.recipeAdjustments { display: grid; gap: 6px; }
+.recipeAdjustments span { display: block; border: .5px solid var(--line); border-radius: 12px; background: var(--surface-1); color: var(--text-secondary); padding: 8px 10px; font-size: 12px; line-height: 1.35; }
+.recipeAdjustments b { display: block; color: var(--ink); margin-bottom: 2px; }
 .weekGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .weekCard { display: grid; gap: 8px; text-align: left; border-radius: 18px; padding: 14px; background: var(--card); }
 .weekCard.active { background: var(--card-2); border-color: var(--accent); color: var(--ink); }
@@ -221,6 +231,7 @@ header p, .card p, .status, .muted { color: var(--muted); }
   .personaButton { max-width: 100%; }
   .personaButton > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fuelSteps { grid-template-columns: 1fr; }
+  .recipeGrid { grid-template-columns: 1fr; }
   .stripNav { grid-template-columns: 36px minmax(0, 1fr) 36px; }
   .stripActions { grid-column: 1 / -1; justify-content: flex-end; padding-left: 0; border-left: 0; }
   .agendaRow { grid-template-columns: 52px minmax(0, 1fr); gap: 8px; }

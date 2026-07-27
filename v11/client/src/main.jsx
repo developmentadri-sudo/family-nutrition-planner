@@ -17,6 +17,7 @@ function Icon({ name }) {
     user: <><path d="M20 21a8 8 0 0 0-16 0" /><circle cx="12" cy="7" r="4" /></>,
     plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
     edit: <><path d="M12 20h9" /><path d="m16.5 3.5 4 4L8 20l-4 1 1-4Z" /></>,
+    recipe: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z" /><path d="M8 7h8" /><path d="M8 11h6" /></>,
     trash: <><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m6 6 1 15h10l1-15" /><path d="M10 11v6" /><path d="M14 11v6" /></>,
     circle: <circle cx="12" cy="12" r="7" />,
     check: <path d="M20 6 9 17l-5-5" />,
@@ -502,6 +503,7 @@ function MealCard({ meal, family, persona, rating, open, membersOpen, note, onTo
   const shiftedForPersona = persona.type === 'person' && meal.time !== familyTime;
   const showKidRating = persona.type === 'person' && isKidProfile(persona.profile);
   const [adaptOpen, setAdaptOpen] = useState(open);
+  const [recipeOpen, setRecipeOpen] = useState(false);
   const [adapting, setAdapting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -542,6 +544,7 @@ function MealCard({ meal, family, persona, rating, open, membersOpen, note, onTo
           {menuOpen && <div className="actionMenu">
             <button onClick={() => choose(onSwap)}><Icon name="swap" /> Swap meal</button>
             <button onClick={() => choose(() => { setAdaptOpen(true); onToggle(); })}><Icon name="ai" /> Suggest variation</button>
+            <button onClick={() => choose(() => setRecipeOpen(!recipeOpen))}><Icon name="recipe" /> Recipe card</button>
             <button onClick={() => choose(onMembers)}><Icon name="user" /> {persona.type === 'family' ? 'User specifics' : 'My specifics'}</button>
             <button onClick={() => choose(onSymptom)}><Icon name="symptom" /> Log symptoms</button>
           </div>}
@@ -554,6 +557,7 @@ function MealCard({ meal, family, persona, rating, open, membersOpen, note, onTo
         {showKidRating && <MealRating rating={rating} onRate={onRate} />}
         {split && visibleTimings.length > 0 && <div className="timingChips">{visibleTimings.map(item => <TimingChip item={item} key={item.profileId || item.name} />)}</div>}
         {membersOpen && <UserSpecificsInline meal={meal} family={family} persona={persona} />}
+        {recipeOpen && <RecipeCard meal={meal} persona={persona} family={family} />}
         {adaptOpen && <div className="adaptBox"><textarea value={note} onChange={e => onNote(e.target.value)} placeholder="Missing ingredient, schedule change, active day..." disabled={adapting} /><button className="primary" onClick={handleAdapt} disabled={adapting}>{adapting ? 'Adapting...' : 'Adapt this meal'}</button></div>}
       </article>
     </div>
@@ -592,6 +596,35 @@ function UserSpecificsInline({ meal, family, persona }) {
         </section>
       ))}
     </div>
+  );
+}
+
+function RecipeCard({ meal, persona, family }) {
+  const recipe = recipeForMeal(meal);
+  const profiles = persona.type === 'family' ? family.profiles || [] : [persona.profile];
+  return (
+    <section className="recipeCard">
+      <div className="recipeHeader">
+        <div>
+          <p className="kicker">Recipe card</p>
+          <h3>{recipe.title}</h3>
+        </div>
+        <span className="pill green">{recipe.time}</span>
+      </div>
+      <div className="recipeGrid">
+        <div>
+          <b>Base ingredients</b>
+          <ul>{recipe.ingredients.map(item => <li key={item}>{item}</li>)}</ul>
+        </div>
+        <div>
+          <b>Quick steps</b>
+          <ol>{recipe.steps.map(item => <li key={item}>{item}</li>)}</ol>
+        </div>
+      </div>
+      {!!profiles.length && <div className="recipeAdjustments">
+        {memberNotesForMeal(meal, profiles).map(item => <span key={item.profileId}><b>{item.name}</b>{item.note}</span>)}
+      </div>}
+    </section>
   );
 }
 
@@ -801,6 +834,49 @@ function kidGrowthMessage(day) {
   if (tags.includes('protein')) return 'Protein helps your body repair, run and play. Pick what you liked after each meal.';
   if (tags.includes('carbs')) return 'Carbs help you have energy for school, games and playground time.';
   return 'Try the meal, notice how it feels, and mark whether you liked it.';
+}
+
+function recipeForMeal(meal) {
+  const title = meal.title || 'Meal';
+  return {
+    title,
+    time: recipeTime(meal),
+    ingredients: recipeIngredients(title, meal.type),
+    steps: recipeSteps(title, meal.type)
+  };
+}
+
+function recipeTime(meal) {
+  if (meal.type === 'snack') return '5 min';
+  if (/omelette|egg|toast|yogurt|porridge/i.test(meal.title)) return '10-15 min';
+  if (/rice|quinoa|potato|pasta|soup|cream/i.test(meal.title)) return '20-30 min';
+  return '15-20 min';
+}
+
+function recipeIngredients(title, type) {
+  const text = title.toLowerCase();
+  const base = [];
+  if (/yogurt|kefir/.test(text)) base.push('lactose-free yogurt or tolerated yogurt', 'berries or kiwi', 'chia, seeds or walnuts if tolerated');
+  else if (/porridge|oat/.test(text)) base.push('oats or rice flakes', 'milk or tolerated alternative', 'banana or berries');
+  else if (/toast/.test(text)) base.push('toast or tolerated bread', 'egg, avocado, hummus or cheese', 'tomato or spinach');
+  else if (/omelette|egg|tortilla/.test(text)) base.push('eggs', 'potato, rice or toast if needed', 'spinach, tomato or zucchini');
+  else if (/prawn|shrimp/.test(text)) base.push('prawns', 'quinoa or rice', 'broccoli, green beans or zucchini', 'lemon and olive oil');
+  else if (/salmon|hake|cod|tuna|bonito/.test(text)) base.push('fish portion', 'rice, potato or quinoa', 'green beans, cucumber or zucchini', 'olive oil and gentle seasoning');
+  else if (/lentil|chickpea|bean|tofu/.test(text)) base.push('legumes or tofu', 'rice, quinoa or potato', 'carrots, spinach or zucchini', 'olive oil');
+  else if (type === 'snack') base.push('fruit', 'yogurt, cheese, seeds or nuts if tolerated', 'rice cakes if extra energy is needed');
+  else base.push('main protein', 'carb base', 'vegetable side', 'olive oil and gentle seasoning');
+  return base;
+}
+
+function recipeSteps(title, type) {
+  const text = title.toLowerCase();
+  if (/yogurt|kefir|porridge|oat/.test(text)) return ['Prepare the base in a bowl.', 'Add fruit and tolerated toppings.', 'Adjust portion by appetite and activity.'];
+  if (/toast/.test(text)) return ['Toast the bread or prepare rice cakes.', 'Add the main topping.', 'Finish with tomato, spinach or a light side.'];
+  if (/omelette|egg|tortilla/.test(text)) return ['Cook the vegetables or potato first if needed.', 'Add eggs and cook gently.', 'Serve with the planned carb or salad side.'];
+  if (/prawn|shrimp|salmon|hake|cod|tuna|bonito/.test(text)) return ['Cook the carb base.', 'Cook fish or prawns simply with olive oil.', 'Add the vegetable pairing and finish with lemon or herbs.'];
+  if (/lentil|chickpea|bean|tofu/.test(text)) return ['Warm or cook the protein base.', 'Add the carb and vegetables.', 'Season gently and adjust portions by profile.'];
+  if (type === 'snack') return ['Plate the fruit or base snack.', 'Add the tolerated protein or topping.', 'Keep it light if activity is close.'];
+  return ['Prepare the base ingredients.', 'Cook simply with gentle seasoning.', 'Adjust portions and add-ons by profile.'];
 }
 
 function performanceWindows(items, activities) {
