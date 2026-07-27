@@ -295,7 +295,7 @@ function Today({ family, persona, plan, activities, selectedDay, onSelectDay, on
   const week = weekDays(plan, weekNumber);
   const day = useMemo(() => plan?.days.find(d => d.dayNumber === selectedDay), [plan, selectedDay]);
   const visibleActivities = useMemo(() => activitiesForPersona(activities, persona), [activities, persona]);
-  const items = useMemo(() => agendaItems(day, visibleActivities), [day, visibleActivities]);
+  const items = useMemo(() => agendaItems(day, visibleActivities, persona), [day, visibleActivities, persona]);
   if (!plan || !day) return <Empty title="No routine generated yet" />;
   async function handleMealAdapt(meal) {
     await onAdaptMeal(meal, notes[meal.id] || '');
@@ -361,6 +361,8 @@ function PersonaContext({ persona, day, activities }) {
 function MealCard({ meal, family, persona, open, membersOpen, note, onToggle, onNote, onAdapt, onSwap, onMembers, onSymptom }) {
   const split = Array.isArray(meal.memberTimings) && meal.memberTimings.length > 0;
   const visibleTimings = timingsForPersona(meal.memberTimings || [], persona);
+  const familyTime = meal.familyTime || meal.time;
+  const shiftedForPersona = persona.type === 'person' && meal.time !== familyTime;
   const [adaptOpen, setAdaptOpen] = useState(open);
   const [adapting, setAdapting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -407,6 +409,7 @@ function MealCard({ meal, family, persona, open, membersOpen, note, onToggle, on
           </div>}
         </div>
         <div className="mealHeader"><p className="kicker">{mealLabels[meal.type]}</p>{meal.reason && <span className="editedPill">Edited</span>}</div>
+        {shiftedForPersona && <p className="familyTimeNote">Family default {familyTime}</p>}
         <h2>{meal.title} <MealEmoji meal={meal} /></h2>
         <p>{meal.description}</p>
         <div className="tagRow">{(meal.tags || inferTags(meal.title)).map(tag => <span className={`pill ${tag.tone}`} key={tag.label}>{tag.label}</span>)}</div>
@@ -677,12 +680,23 @@ function isToday(day) {
   return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
 }
 
-function agendaItems(day, activities) {
+function agendaItems(day, activities, persona) {
   if (!day) return [];
   return [
-    ...day.meals.map(meal => ({ ...meal, kind: 'meal' })),
+    ...day.meals.map(meal => mealForPersonaAgenda(meal, persona)),
     ...groupActivities(activities.filter(activity => Number(activity.dayNumber) === Number(day.dayNumber)))
   ].sort((a, b) => toMinutes(a.time) - toMinutes(b.time) || (a.kind === 'activity' ? -1 : 1));
+}
+
+function mealForPersonaAgenda(meal, persona) {
+  if (persona.type !== 'person') return { ...meal, kind: 'meal', familyTime: meal.time };
+  const personalTiming = timingsForPersona(meal.memberTimings || [], persona)[0];
+  return {
+    ...meal,
+    kind: 'meal',
+    familyTime: meal.time,
+    time: personalTiming?.time || meal.time
+  };
 }
 
 function groupActivities(activities) {
