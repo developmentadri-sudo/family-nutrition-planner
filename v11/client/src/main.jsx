@@ -154,6 +154,7 @@ function App() {
             <div className="viewToggle" aria-label="View mode">
               <button className={activeTab === 'Today' ? 'active' : ''} onClick={() => setActiveTab('Today')}>Day</button>
               <button className={activeTab === 'Week' ? 'active' : ''} onClick={() => setActiveTab('Week')}>Week</button>
+              <button className={activeTab === 'Symptoms' ? 'active' : ''} onClick={() => setActiveTab('Symptoms')}>Symptoms</button>
               <button className={activeTab === 'Profiles' ? 'active' : ''} onClick={() => setActiveTab('Profiles')}>Profiles</button>
             </div>
             <button className="personaButton" onClick={() => setPersonaOpen(true)}>
@@ -166,6 +167,7 @@ function App() {
       <main className="shell">
         {activeTab === 'Profiles' && <Profiles family={family} plan={plan} persona={persona} onChange={saveFamily} onGenerate={generatePlan} />}
         {activeTab === 'Week' && <Week plan={plan} persona={persona} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} />}
+        {activeTab === 'Symptoms' && <SymptomsPage family={family} persona={persona} symptoms={symptoms} />}
         {activeTab === 'Today' && <Today family={family} persona={persona} plan={plan} activities={activities} symptoms={symptoms} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
       </main>
       <Toast message={toast} onDone={() => setToast('')} />
@@ -308,7 +310,7 @@ function Today({ family, persona, plan, activities, symptoms, selectedDay, onSel
     <section className="today">
       <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} onAdd={() => setEventOpen(true)} onAdapt={() => onAdaptDay(selectedDay)} />
       <PersonaContext persona={persona} day={day} activities={activities} />
-      <SymptomHistory persona={persona} symptoms={symptoms} profiles={family.profiles || []} />
+      <SymptomHistory persona={persona} symptoms={symptomsForDay(symptoms, selectedDay)} profiles={family.profiles || []} mode="day" />
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
         : <MealCard key={item.id} meal={item} family={family} persona={persona} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} />)}</div>
@@ -316,6 +318,15 @@ function Today({ family, persona, plan, activities, symptoms, selectedDay, onSel
       {symptomMeal && <SymptomDialog meal={symptomMeal} dayNumber={selectedDay} family={family} persona={persona} onClose={() => setSymptomMeal(null)} onSave={payload => { onLogSymptom(payload); setSymptomMeal(null); }} />}
       {eventOpen && <EventDialog dayNumber={selectedDay} family={family} onClose={() => setEventOpen(false)} onSave={payload => { onAddActivity(payload); setEventOpen(false); }} />}
       {editingEvent && <EventDialog dayNumber={selectedDay} family={family} activity={editingEvent} onClose={() => setEditingEvent(null)} onSave={payload => { onUpdateActivity(editingEvent.id, payload); setEditingEvent(null); }} />}
+    </section>
+  );
+}
+
+function SymptomsPage({ family, persona, symptoms }) {
+  return (
+    <section className="today">
+      <PersonaContext persona={persona} day={null} activities={[]} />
+      <SymptomHistory persona={persona} symptoms={symptoms} profiles={family.profiles || []} mode="summary" />
     </section>
   );
 }
@@ -349,8 +360,10 @@ function WeekSelector({ week, selectedDay, onSelectDay, onShift, onAdd, onAdapt 
 
 function PersonaContext({ persona, day, activities }) {
   const activityCount = activitiesForPersona(activities.filter(activity => Number(activity.dayNumber) === Number(day?.dayNumber)), persona).length;
-  const title = persona.type === 'family' ? 'Family view' : `${persona.profile.name}'s day`;
-  const text = persona.type === 'family'
+  const title = persona.type === 'family' ? 'Family view' : day ? `${persona.profile.name}'s day` : `${persona.profile.name}'s lens`;
+  const text = !day
+    ? (persona.type === 'family' ? 'Shared health history across the family.' : personaDescription(persona.profile))
+    : persona.type === 'family'
     ? 'Shared plan first, with individual timing and adjustments available inside each meal.'
     : personaDayMessage(persona.profile, day, activityCount);
 
@@ -362,25 +375,26 @@ function PersonaContext({ persona, day, activities }) {
   );
 }
 
-function SymptomHistory({ persona, symptoms, profiles }) {
+function SymptomHistory({ persona, symptoms, profiles, mode }) {
   const visible = symptomsForPersona(symptoms, persona);
   const profileName = persona.type === 'person' ? persona.profile.name : 'Family';
   const pattern = strongestSymptomPattern(visible);
-  if (!visible.length && persona.type === 'family') return null;
+  const isSummary = mode === 'summary';
+  if (!visible.length && !isSummary) return null;
 
   return (
     <section className="symptomPanel">
       <div className="symptomHeader">
         <div>
-          <p className="kicker">{persona.type === 'family' ? 'Family symptoms' : `${profileName} comfort history`}</p>
+          <p className="kicker">{isSummary ? (persona.type === 'family' ? 'Symptom summary' : `${profileName} symptom summary`) : 'Logged on this day'}</p>
           <h2>{visible.length ? `${visible.length} logged reaction${visible.length === 1 ? '' : 's'}` : 'No symptoms logged yet'}</h2>
         </div>
         {pattern && <span className="pill orange">Pattern forming</span>}
       </div>
       {pattern && <p className="patternNote">{pattern}</p>}
-      {!visible.length && <p className="muted">Log a symptom from any completed meal to start building a personal history.</p>}
+      {!visible.length && <p className="muted">Log a symptom from a meal card and it will appear here as a health history, not on every day of the plan.</p>}
       {!!visible.length && <div className="symptomList">
-        {visible.slice(0, 4).map(item => <SymptomItem symptom={item} profiles={profiles} persona={persona} key={item.id} />)}
+        {visible.slice(0, isSummary ? 12 : 4).map(item => <SymptomItem symptom={item} profiles={profiles} persona={persona} key={item.id} />)}
       </div>}
     </section>
   );
@@ -674,6 +688,10 @@ function symptomsForPersona(symptoms, persona) {
   const sorted = [...(symptoms || [])].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   if (persona.type === 'family') return sorted;
   return sorted.filter(item => item.profileId === persona.profile.id);
+}
+
+function symptomsForDay(symptoms, dayNumber) {
+  return (symptoms || []).filter(item => Number(item.dayNumber) === Number(dayNumber));
 }
 
 function strongestSymptomPattern(symptoms) {
