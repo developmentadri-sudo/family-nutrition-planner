@@ -20,5 +20,6 @@ export const api = {
   addActivity: (payload) => request('/activities', { method: 'POST', body: JSON.stringify(payload) }),
   updateActivity: (activityId, payload) => request(`/activities/${activityId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteActivity: (activityId) => request(`/activities/${activityId}`, { method: 'DELETE' }),
+  getSymptoms: () => request('/symptoms'),
   logSymptom: (payload) => request('/symptoms', { method: 'POST', body: JSON.stringify(payload) })
 };

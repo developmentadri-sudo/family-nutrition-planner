@@ -130,9 +130,14 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { activities: store.activities });
     }
 
+    if (req.method === 'GET' && route === '/symptoms') {
+      const store = await readStore();
+      return send(res, 200, { symptoms: store.symptoms || [] });
+    }
+
     if (req.method === 'POST' && route === '/symptoms') {
-      const symptom = { id: `symptom-${Date.now()}`, ...body, createdAt: new Date().toISOString() };
-      const store = await updateStore(current => ({ ...current, symptoms: [symptom, ...current.symptoms] }));
+      const symptom = normalizeSymptom(body);
+      const store = await updateStore(current => ({ ...current, symptoms: [symptom, ...(current.symptoms || [])] }));
       return send(res, 200, { symptom, symptoms: store.symptoms });
     }
 
@@ -178,6 +183,22 @@ function normalizeActivity(activity) {
     type: activity.type || 'Activity',
     time: activity.time || '09:00',
     createdAt: activity.createdAt || new Date().toISOString()
+  };
+}
+
+function normalizeSymptom(symptom) {
+  return {
+    id: symptom.id || `symptom-${Date.now()}`,
+    profileId: symptom.profileId || '',
+    mealId: symptom.mealId || '',
+    mealTitle: symptom.mealTitle || '',
+    mealType: symptom.mealType || '',
+    dayNumber: Number(symptom.dayNumber || 0),
+    delay: symptom.delay || '',
+    symptom: symptom.symptom || 'Other',
+    notes: symptom.notes || '',
+    tags: Array.isArray(symptom.tags) ? symptom.tags : [],
+    createdAt: symptom.createdAt || new Date().toISOString()
   };
 }
 

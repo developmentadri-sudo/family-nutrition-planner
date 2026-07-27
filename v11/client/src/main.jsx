@@ -30,8 +30,9 @@ function App() {
   const [family, setFamily] = useState(null);
   const [plan, setPlan] = useState(null);
   const [activities, setActivities] = useState([]);
+  const [symptoms, setSymptoms] = useState([]);
   const [selectedDay, setSelectedDay] = useState(1);
-  const [status, setStatus] = useState('Loading v12.3 workspace...');
+  const [status, setStatus] = useState('Loading v12.4 workspace...');
   const [toast, setToast] = useState('');
   const [selectedPersona, setSelectedPersona] = useState(() => localStorage.getItem(personaStorageKey) || '');
   const [personaOpen, setPersonaOpen] = useState(false);
@@ -41,10 +42,11 @@ function App() {
   }
 
   async function refresh() {
-    const [familyData, planData, activityData] = await Promise.all([api.getFamily(), api.getCurrentPlan(), api.getActivities()]);
+    const [familyData, planData, activityData, symptomData] = await Promise.all([api.getFamily(), api.getCurrentPlan(), api.getActivities(), api.getSymptoms()]);
     setFamily(familyData);
     setPlan(planData.plan);
     setActivities(activityData.activities || []);
+    setSymptoms(symptomData.symptoms || []);
     setActiveTab(planData.plan ? 'Today' : 'Profiles');
     setStatus(planData.plan ? 'Routine loaded.' : 'Create profiles, then generate the first routine.');
   }
@@ -106,7 +108,8 @@ function App() {
   }
 
   async function logSymptom(payload) {
-    await api.logSymptom(payload);
+    const result = await api.logSymptom(payload);
+    setSymptoms(result.symptoms || []);
     notify('Symptom logged.');
   }
 
@@ -163,7 +166,7 @@ function App() {
       <main className="shell">
         {activeTab === 'Profiles' && <Profiles family={family} plan={plan} persona={persona} onChange={saveFamily} onGenerate={generatePlan} />}
         {activeTab === 'Week' && <Week plan={plan} persona={persona} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} />}
-        {activeTab === 'Today' && <Today family={family} persona={persona} plan={plan} activities={activities} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
+        {activeTab === 'Today' && <Today family={family} persona={persona} plan={plan} activities={activities} symptoms={symptoms} selectedDay={selectedDay} onSelectDay={setSelectedDay} onAdaptMeal={adaptMeal} onAdaptDay={adaptDay} onSwapMeal={swapMeal} onLogSymptom={logSymptom} onAddActivity={addActivity} onUpdateActivity={updateActivity} onDeleteActivity={deleteActivity} />}
       </main>
       <Toast message={toast} onDone={() => setToast('')} />
       {personaOpen && <PersonaSelector family={family} selectedPersona={selectedPersona} onChoose={choosePersona} />}
@@ -283,7 +286,7 @@ function Week({ plan, persona, activities, selectedDay, onSelectDay }) {
   );
 }
 
-function Today({ family, persona, plan, activities, selectedDay, onSelectDay, onAdaptMeal, onAdaptDay, onSwapMeal, onLogSymptom, onAddActivity, onUpdateActivity, onDeleteActivity }) {
+function Today({ family, persona, plan, activities, symptoms, selectedDay, onSelectDay, onAdaptMeal, onAdaptDay, onSwapMeal, onLogSymptom, onAddActivity, onUpdateActivity, onDeleteActivity }) {
   const [open, setOpen] = useState({});
   const [memberOpen, setMemberOpen] = useState({});
   const [notes, setNotes] = useState({});
@@ -305,11 +308,12 @@ function Today({ family, persona, plan, activities, selectedDay, onSelectDay, on
     <section className="today">
       <WeekSelector week={week} selectedDay={selectedDay} onSelectDay={onSelectDay} onShift={delta => onSelectDay(Math.max(1, Math.min(28, selectedDay + delta * 7)))} onAdd={() => setEventOpen(true)} onAdapt={() => onAdaptDay(selectedDay)} />
       <PersonaContext persona={persona} day={day} activities={activities} />
+      <SymptomHistory persona={persona} symptoms={symptoms} profiles={family.profiles || []} />
       <div className="agenda">{items.map(item => item.kind === 'activity'
         ? <ActivityCard key={item.id} activity={item} onEdit={setEditingEvent} onDelete={onDeleteActivity} />
         : <MealCard key={item.id} meal={item} family={family} persona={persona} open={!!open[item.id]} membersOpen={!!memberOpen[item.id]} note={notes[item.id] || ''} onToggle={() => setOpen({ ...open, [item.id]: !open[item.id] })} onNote={value => setNotes({ ...notes, [item.id]: value })} onAdapt={() => handleMealAdapt(item)} onSwap={() => setSwapMeal(item)} onMembers={() => setMemberOpen(current => ({ ...current, [item.id]: !current[item.id] }))} onSymptom={() => setSymptomMeal(item)} />)}</div>
       {swapMeal && <SwapDrawer meal={swapMeal} plan={plan} onClose={() => setSwapMeal(null)} onChoose={targetId => { onSwapMeal(swapMeal, targetId); setSwapMeal(null); }} />}
-      {symptomMeal && <SymptomDialog meal={symptomMeal} family={family} persona={persona} onClose={() => setSymptomMeal(null)} onSave={payload => { onLogSymptom(payload); setSymptomMeal(null); }} />}
+      {symptomMeal && <SymptomDialog meal={symptomMeal} dayNumber={selectedDay} family={family} persona={persona} onClose={() => setSymptomMeal(null)} onSave={payload => { onLogSymptom(payload); setSymptomMeal(null); }} />}
       {eventOpen && <EventDialog dayNumber={selectedDay} family={family} onClose={() => setEventOpen(false)} onSave={payload => { onAddActivity(payload); setEventOpen(false); }} />}
       {editingEvent && <EventDialog dayNumber={selectedDay} family={family} activity={editingEvent} onClose={() => setEditingEvent(null)} onSave={payload => { onUpdateActivity(editingEvent.id, payload); setEditingEvent(null); }} />}
     </section>
@@ -355,6 +359,42 @@ function PersonaContext({ persona, day, activities }) {
       <span className="avatar mini"><span className="avatarLetter">{persona.type === 'family' ? 'FA' : persona.profile.name?.slice(0, 2).toUpperCase()}</span></span>
       <div><b>{title}</b><span>{text}</span></div>
     </section>
+  );
+}
+
+function SymptomHistory({ persona, symptoms, profiles }) {
+  const visible = symptomsForPersona(symptoms, persona);
+  const profileName = persona.type === 'person' ? persona.profile.name : 'Family';
+  const pattern = strongestSymptomPattern(visible);
+  if (!visible.length && persona.type === 'family') return null;
+
+  return (
+    <section className="symptomPanel">
+      <div className="symptomHeader">
+        <div>
+          <p className="kicker">{persona.type === 'family' ? 'Family symptoms' : `${profileName} comfort history`}</p>
+          <h2>{visible.length ? `${visible.length} logged reaction${visible.length === 1 ? '' : 's'}` : 'No symptoms logged yet'}</h2>
+        </div>
+        {pattern && <span className="pill orange">Pattern forming</span>}
+      </div>
+      {pattern && <p className="patternNote">{pattern}</p>}
+      {!visible.length && <p className="muted">Log a symptom from any completed meal to start building a personal history.</p>}
+      {!!visible.length && <div className="symptomList">
+        {visible.slice(0, 4).map(item => <SymptomItem symptom={item} profiles={profiles} persona={persona} key={item.id} />)}
+      </div>}
+    </section>
+  );
+}
+
+function SymptomItem({ symptom, profiles, persona }) {
+  const profile = profiles.find(item => item.id === symptom.profileId);
+  const owner = persona.type === 'family' ? `${profile?.name || 'Profile'} · ` : '';
+  return (
+    <div className="symptomItem">
+      <b>{owner}{symptom.symptom}</b>
+      <span>{symptom.delay} after {symptom.mealTitle || 'meal'}</span>
+      <small>{symptom.dayNumber ? `Day ${symptom.dayNumber}` : formatShortDate(symptom.createdAt)}</small>
+    </div>
   );
 }
 
@@ -466,11 +506,11 @@ function MemberDrawer({ meal, family, onClose }) {
   return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>User Specifics</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><div className="memberList">{notes.map(item => <section className="memberNote" key={item.profileId}><div className="avatar"><span className="avatarLetter">{item.name?.slice(0, 2).toUpperCase() || 'P'}</span></div><div><h3>{item.name}</h3><p>{item.note}</p></div></section>)}</div></aside></div>;
 }
 
-function SymptomDialog({ meal, family, persona, onSave, onClose }) {
+function SymptomDialog({ meal, dayNumber, family, persona, onSave, onClose }) {
   const [profileId, setProfileId] = useState(persona.type === 'person' ? persona.profile.id : family.profiles[0]?.id || '');
   const [delay, setDelay] = useState('1 hour');
   const [symptom, setSymptom] = useState('Headache');
-  return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>Log Symptom</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><label>Profile<select value={profileId} onChange={e => setProfileId(e.target.value)}>{family.profiles.map(profile => <option value={profile.id} key={profile.id}>{profile.name}</option>)}</select></label><label>Time since meal<select value={delay} onChange={e => setDelay(e.target.value)}>{['30 minutes', '1 hour', '2 hours', '4 hours', 'Next morning'].map(item => <option key={item}>{item}</option>)}</select></label><label>Symptom<select value={symptom} onChange={e => setSymptom(e.target.value)}>{['Headache', 'Bloating', 'Cramps', 'Nausea', 'Reflux', 'Fatigue', 'Other'].map(item => <option key={item}>{item}</option>)}</select></label><button className="primary" onClick={() => onSave({ profileId, mealId: meal.id, mealTitle: meal.title, delay, symptom })}>OK</button></aside></div>;
+  return <div className="drawer"><div className="shade" onClick={onClose} /><aside><div className="toolbar"><div><h2>Log Symptom</h2><p>{meal.title}</p></div><button onClick={onClose}>Close</button></div><label>Profile<select value={profileId} onChange={e => setProfileId(e.target.value)}>{family.profiles.map(profile => <option value={profile.id} key={profile.id}>{profile.name}</option>)}</select></label><label>Time since meal<select value={delay} onChange={e => setDelay(e.target.value)}>{['30 minutes', '1 hour', '2 hours', '4 hours', 'Next morning'].map(item => <option key={item}>{item}</option>)}</select></label><label>Symptom<select value={symptom} onChange={e => setSymptom(e.target.value)}>{['Headache', 'Bloating', 'Cramps', 'Nausea', 'Reflux', 'Fatigue', 'Other'].map(item => <option key={item}>{item}</option>)}</select></label><button className="primary" onClick={() => onSave({ profileId, mealId: meal.id, mealTitle: meal.title, mealType: meal.type, dayNumber, delay, symptom, tags: meal.tags || inferTags(meal.title) })}>OK</button></aside></div>;
 }
 
 function EventDialog({ dayNumber, family, activity, onSave, onClose }) {
@@ -628,6 +668,40 @@ function dayLensSummary(day, activities, persona) {
 
 function mealCount(day) {
   return day?.meals?.length || 0;
+}
+
+function symptomsForPersona(symptoms, persona) {
+  const sorted = [...(symptoms || [])].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  if (persona.type === 'family') return sorted;
+  return sorted.filter(item => item.profileId === persona.profile.id);
+}
+
+function strongestSymptomPattern(symptoms) {
+  if (symptoms.length < 5) return '';
+  const bySymptom = countBy(symptoms, item => item.symptom || 'Other');
+  const topSymptom = [...bySymptom.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (topSymptom?.[1] >= 5) return `${topSymptom[0]} has been logged ${topSymptom[1]} times. Review recent meals before treating it as a true intolerance.`;
+
+  const byPair = countBy(symptoms, item => `${item.symptom || 'Other'}|${item.mealTitle || 'meal'}`);
+  const topPair = [...byPair.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (topPair?.[1] >= 3) {
+    const [symptom, meal] = topPair[0].split('|');
+    return `${symptom} appears ${topPair[1]} times after ${meal}. This is worth watching over the next meals.`;
+  }
+  return '';
+}
+
+function countBy(items, keyForItem) {
+  return items.reduce((map, item) => {
+    const key = keyForItem(item);
+    map.set(key, (map.get(key) || 0) + 1);
+    return map;
+  }, new Map());
+}
+
+function formatShortDate(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function personaLabel(personaId, family) {
