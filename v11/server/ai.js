@@ -138,7 +138,7 @@ function isSmallMealEdit(note) {
 }
 
 function createSmallMealEdit(meal, payload, note, profiles) {
-  const addition = sideDishPhrase(note);
+  const addition = sideDishPhrase(meal, note);
   const description = withSentence(
     meal.description || describeLocalAdaptation(meal.title, meal.type),
     addition
@@ -155,14 +155,54 @@ function createSmallMealEdit(meal, payload, note, profiles) {
   };
 }
 
-function sideDishPhrase(note) {
+function sideDishPhrase(meal, note) {
   const text = note.toLowerCase();
-  if (/veggie|vegetable|greens|salad/.test(text)) return 'Add a simple vegetable side while keeping the main dish unchanged.';
-  if (/fruit|berry|banana|kiwi|apple/.test(text)) return 'Add fruit as the small side or topping while keeping the base meal unchanged.';
-  if (/seed|nut|walnut|almond/.test(text)) return 'Adjust the topping with tolerated seeds or nuts while keeping the base meal unchanged.';
+  if (/veggie|vegetable|greens|salad/.test(text)) return vegetablePairingForMeal(meal);
+  if (/fruit|berry|banana|kiwi|apple/.test(text)) return fruitPairingForMeal(meal);
+  if (/seed|nut|walnut|almond/.test(text)) return toppingPairingForMeal(meal);
   if (/portion|smaller|bigger|less|more/.test(text)) return 'Adjust portions by person while keeping the recipe structure unchanged.';
-  if (/side/.test(text)) return 'Change only the side dish and keep the main meal unchanged.';
+  if (/side/.test(text)) return sidePairingForMeal(meal);
   return 'Make a small adjustment and keep the main meal unchanged.';
+}
+
+function vegetablePairingForMeal(meal) {
+  const title = String(meal.title || '').toLowerCase();
+  if (/prawn|shrimp/.test(title) && /quinoa/.test(title)) return 'Add roasted broccoli or green beans with lemon; they pair well with prawns and keep the quinoa bowl balanced.';
+  if (/prawn|shrimp/.test(title)) return 'Add zucchini ribbons or green beans with lemon and olive oil to keep the prawn dish light.';
+  if (/salmon|tuna|bonito/.test(title)) return 'Add cucumber, steamed green beans or roasted zucchini; they balance oily fish without making the meal heavy.';
+  if (/hake|cod|white fish/.test(title)) return 'Add carrots, zucchini or green beans; mild vegetables keep the white fish gentle and complete.';
+  if (/egg|omelette|tortilla/.test(title)) return 'Add spinach and tomato, or zucchini on the side; they fit the egg base without changing the dish.';
+  if (/rice/.test(title)) return 'Add sauteed zucchini, carrots or spinach into the rice base for color, fiber and easy digestion.';
+  if (/potato/.test(title)) return 'Add green beans or a simple tomato-cucumber salad to lighten the potato base.';
+  if (/lentil|chickpea|bean/.test(title)) return 'Add roasted carrots, zucchini or spinach; they soften the legume bowl and add freshness.';
+  if (/toast|avocado/.test(title)) return 'Add tomato and spinach on the toast, or cucumber on the side for a fresh vegetable layer.';
+  if (/yogurt|porridge|oat/.test(title)) return 'Vegetables do not fit this meal naturally; choose berries or kiwi instead, or add cucumber/tomato later with lunch.';
+  return 'Add zucchini, spinach or green beans as the vegetable side; they pair broadly and keep the meal balanced.';
+}
+
+function fruitPairingForMeal(meal) {
+  const title = String(meal.title || '').toLowerCase();
+  if (/salmon|tuna|bonito|prawn|hake|cod/.test(title)) return 'Pair it with kiwi, strawberries or blueberries for a fresh vitamin-C side that works well with fish.';
+  if (/egg|omelette|toast/.test(title)) return 'Add kiwi or berries on the side; they keep the meal light and add freshness.';
+  if (/yogurt|kefir|porridge|oat/.test(title)) return 'Use blueberries, kiwi or strawberries as the topping instead of changing the base.';
+  return 'Add kiwi, berries or orange as the fruit side; keep it small so the meal stays balanced.';
+}
+
+function toppingPairingForMeal(meal) {
+  const title = String(meal.title || '').toLowerCase();
+  if (/yogurt|kefir|porridge|oat/.test(title)) return 'Use chia, pumpkin seeds or walnuts as the topping if tolerated.';
+  if (/salmon|tuna|bonito/.test(title)) return 'Add a small walnut or seed topping only if tolerated; keep it modest with oily fish.';
+  if (/salad|quinoa|rice/.test(title)) return 'Add pumpkin seeds or sesame as a light topping for texture without changing the bowl.';
+  return 'Add tolerated seeds or a small nut portion as the topping while keeping the main meal structure.';
+}
+
+function sidePairingForMeal(meal) {
+  const title = String(meal.title || '').toLowerCase();
+  if (/prawn|shrimp|salmon|hake|cod|tuna|bonito/.test(title)) return 'Use green beans, zucchini or cucumber salad as the side; these pair cleanly with seafood and fish.';
+  if (/egg|omelette|tortilla/.test(title)) return 'Use spinach, tomato or zucchini as the side so the egg dish stays familiar.';
+  if (/lentil|chickpea|bean|tofu/.test(title)) return 'Use carrots, spinach or roasted zucchini as the side to balance the legume base.';
+  if (/toast|avocado/.test(title)) return 'Use tomato, cucumber or spinach as the side for a fresh, simple plate.';
+  return vegetablePairingForMeal(meal);
 }
 
 function withSentence(description, sentence) {
